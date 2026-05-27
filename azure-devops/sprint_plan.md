@@ -89,7 +89,6 @@ Each work item should use a small set of tags that make bulk filtering and path 
 - Azure Boards remains the system of record for live work item state, ownership, priority, and completion status.
 - This document summarizes planning structure; it does not replace the live Azure Boards backlog.
 - Sprint start and end dates are not defined in this file because the current Azure DevOps iteration setup does not show dates.
-- User Story IDs are listed only where currently visible and confirmed.
 - Sprint 9 is optional hardening work and may be reduced if the core platform needs more time.
 
 ## Traceability
