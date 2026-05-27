@@ -50,12 +50,6 @@ azure-devops/backlog.md
 
 Work connected to this artifact should reference the Azure Boards work item in the Git commit message.
 
-Recommended commit message:
-
-```bash
-git commit -m "Create Azure DevOps backlog structure artifact AB#1375"
-```
-
 Traceability chain:
 
 ```text
