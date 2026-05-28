@@ -15,8 +15,10 @@ ClinicalPulse uses Synthea synthetic EHR data as the source system for downstrea
 | Source system | Synthea synthetic EHR data |
 | Generation geography | Massachusetts, United States |
 | Portfolio context | Ontario-facing governed hospital BI simulation |
-| Population size | 1,000 synthetic patients for the initial development baseline |
-| Random seed | Fixed seed: `1409` |
+| Population setting | 1,000 living synthetic patients |
+| Observed generated records | 1,145 total patient records: 1,000 alive and 145 deceased |
+| Random seed | Synthea RNG: `1000` |
+| Clinician/provider seed | Clinician RNG: `5643` |
 | Export format | CSV |
 | Raw data location | `data/raw/synthea/` |
 | Ingestion target | SQL Server bronze layer |
@@ -29,7 +31,11 @@ Massachusetts is selected as the Synthea generation geography because it is a st
 
 ClinicalPulse remains framed as an Ontario-facing healthcare BI portfolio project. However, the generated dataset does not represent Ontario patients, Ontario hospitals, Ontario demographics, or Ontario health-system operations.
 
-The fixed seed supports reproducibility. The selected population size of 1,000 synthetic patients is large enough to support meaningful source profiling, ingestion testing, quality validation, KPI development, and dashboard prototyping, while remaining small enough for fast local development and manual inspection.
+The population setting of 1,000 living synthetic patients is large enough to support meaningful source profiling, ingestion testing, quality validation, KPI development, and dashboard prototyping, while remaining small enough for fast local development and manual inspection.
+
+Synthea may generate more total patient records than the requested living population because deceased simulated patients are included in the output. The retained generation run produced 1,145 total patient records: 1,000 alive and 145 deceased.
+
+The recorded RNG values support reproducibility of the retained dataset. Future regeneration attempts should use the same Synthea version, geography, population setting, export settings, and seed values where possible.
 
 Larger Synthea populations may be generated later for scalability or performance testing after the ingestion, transformation, validation, and reporting layers are stable.
 
@@ -64,17 +70,21 @@ Optional entities may be generated but are not part of the core implementation s
 
 ## Reproducibility Notes
 
-The generation run should be documented with:
+The retained generation run is documented as follows:
 
 | Item | Value |
 |---|---|
 | Geography | Massachusetts, United States |
-| Population | 1,000 synthetic patients |
-| Seed | `1409` |
+| Population setting | 1,000 living synthetic patients |
+| Generated patient records | 1,145 total records |
+| Alive patients | 1,000 |
+| Deceased patients | 145 |
+| Synthea RNG | `1000` |
+| Clinician RNG | `5643` |
 | Export format | CSV |
 | Output folder | `data/raw/synthea/` |
 
-The exact command used to generate or acquire the dataset should be recorded when the source files are generated.
+The exact command used to generate or acquire the dataset should be recorded once finalized in the source acquisition and regeneration documentation.
 
 ## Data Handling Rules
 
@@ -99,6 +109,8 @@ Any committed sample data must be synthetic, minimal, clearly documented, and sa
 The dataset is synthetic and does not contain real patient information.
 
 The dataset does not represent Ontario patients, Ontario hospitals, Ontario demographics, or Ontario healthcare operations.
+
+The retained generation run produced more total patient records than the requested living population because deceased synthetic patients are included in the output.
 
 ClinicalPulse uses the dataset to demonstrate healthcare BI engineering, governance, validation, reporting, and interoperability concepts.
 
