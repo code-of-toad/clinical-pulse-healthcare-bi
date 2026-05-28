@@ -1,0 +1,10 @@
+﻿Column,Purpose,Publish Field
+Work Item Type,"Azure Boards work item type for the row. Use Agile process names: Epic, Feature, User Story, Task.",Yes
+Title 1,Epic title column. Populate only for Epic rows.,"Yes, tree title level"
+Title 2,Feature title column. Populate only for Feature rows.,"Yes, tree title level"
+Title 3,User Story title column. Populate only for User Story rows.,"Yes, tree title level"
+Title 4,Task title column. Populate only for Task rows.,"Yes, tree title level"
+State,Initial state. Defaults to New.,Yes
+Description,Plain-language explanation of the work item.,Yes
+Acceptance Criteria,"Populated for User Stories and, in the primary file, Features. Use story-only fallback if Feature criteria fail to publish.","Yes, if available in your process/work item type"
+Tags,"ClinicalPulse, sprint, phase, external ID, and workstream tags.",Yes

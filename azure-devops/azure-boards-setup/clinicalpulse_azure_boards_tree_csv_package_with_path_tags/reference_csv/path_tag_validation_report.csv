@@ -1,0 +1,13 @@
+File,Rows,Rows with exactly one Title column,Rows with AP tag,Rows with IP tag,Validation Status
+import_csv/00_pilot_branch_tree_import.csv,5,5,5,5,PASS
+import_csv/01_all_items_tree_import_feature_and_story_criteria.csv,371,371,371,371,PASS
+import_csv/02_all_items_tree_import_story_criteria_only.csv,371,371,371,371,PASS
+import_csv/by_epic/E01_project_governance_planning_tree_import.csv,34,34,34,34,PASS
+import_csv/by_epic/E02_source_data_foundation_tree_import.csv,31,31,31,31,PASS
+import_csv/by_epic/E03_sql_server_ingestion_tree_import.csv,47,47,47,47,PASS
+import_csv/by_epic/E04_medallion_data_pipeline_tree_import.csv,52,52,52,52,PASS
+import_csv/by_epic/E05_data_quality_governance_tree_import.csv,41,41,41,41,PASS
+import_csv/by_epic/E06_power_bi_reporting_tree_import.csv,51,51,51,51,PASS
+import_csv/by_epic/E07_fhir_api_interoperability_tree_import.csv,45,45,45,45,PASS
+import_csv/by_epic/E08_documentation_portfolio_delivery_tree_import.csv,34,34,34,34,PASS
+import_csv/by_epic/E09_optional_pipeline_hardening_tree_import.csv,36,36,36,36,PASS

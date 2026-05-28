@@ -1,0 +1,96 @@
+{
+  "package": "/mnt/data/clinicalpulse_azure_boards_excel_tree_csv_package",
+  "total_work_items": 371,
+  "counts": {
+    "Epic": 9,
+    "Feature": 27,
+    "User Story": 97,
+    "Task": 238
+  },
+  "main_files": [
+    "import_csv/00_pilot_branch_tree_import.csv",
+    "import_csv/01_all_items_tree_import_feature_and_story_criteria.csv",
+    "import_csv/02_all_items_tree_import_story_criteria_only.csv"
+  ],
+  "by_epic_files": [
+    "E01_project_governance_planning_tree_import.csv",
+    "E02_source_data_foundation_tree_import.csv",
+    "E03_sql_server_ingestion_tree_import.csv",
+    "E04_medallion_data_pipeline_tree_import.csv",
+    "E05_data_quality_governance_tree_import.csv",
+    "E06_power_bi_reporting_tree_import.csv",
+    "E07_fhir_api_interoperability_tree_import.csv",
+    "E08_documentation_portfolio_delivery_tree_import.csv",
+    "E09_optional_pipeline_hardening_tree_import.csv"
+  ],
+  "path_tag_update": "Added AP-<Area Path> and IP-<Iteration Path> tags to every work item CSV row.",
+  "updated_csv_files": [
+    {
+      "file": "import_csv/01_all_items_tree_import_feature_and_story_criteria.csv",
+      "updated_rows": 371,
+      "total_rows": 371
+    },
+    {
+      "file": "import_csv/02_all_items_tree_import_story_criteria_only.csv",
+      "updated_rows": 371,
+      "total_rows": 371
+    },
+    {
+      "file": "import_csv/00_pilot_branch_tree_import.csv",
+      "updated_rows": 5,
+      "total_rows": 5
+    },
+    {
+      "file": "import_csv/by_epic/E01_project_governance_planning_tree_import.csv",
+      "updated_rows": 34,
+      "total_rows": 34
+    },
+    {
+      "file": "import_csv/by_epic/E02_source_data_foundation_tree_import.csv",
+      "updated_rows": 31,
+      "total_rows": 31
+    },
+    {
+      "file": "import_csv/by_epic/E03_sql_server_ingestion_tree_import.csv",
+      "updated_rows": 47,
+      "total_rows": 47
+    },
+    {
+      "file": "import_csv/by_epic/E04_medallion_data_pipeline_tree_import.csv",
+      "updated_rows": 52,
+      "total_rows": 52
+    },
+    {
+      "file": "import_csv/by_epic/E05_data_quality_governance_tree_import.csv",
+      "updated_rows": 41,
+      "total_rows": 41
+    },
+    {
+      "file": "import_csv/by_epic/E06_power_bi_reporting_tree_import.csv",
+      "updated_rows": 51,
+      "total_rows": 51
+    },
+    {
+      "file": "import_csv/by_epic/E07_fhir_api_interoperability_tree_import.csv",
+      "updated_rows": 45,
+      "total_rows": 45
+    },
+    {
+      "file": "import_csv/by_epic/E08_documentation_portfolio_delivery_tree_import.csv",
+      "updated_rows": 34,
+      "total_rows": 34
+    },
+    {
+      "file": "import_csv/by_epic/E09_optional_pipeline_hardening_tree_import.csv",
+      "updated_rows": 36,
+      "total_rows": 36
+    },
+    {
+      "file": "reference_csv/work_items_detailed_reference.csv",
+      "updated_rows": 371,
+      "total_rows": 371
+    }
+  ],
+  "path_tag_validation_report": "reference_csv/path_tag_validation_report.csv",
+  "path_tag_assignment_reference": "reference_csv/path_tag_assignment_reference.csv"
+}

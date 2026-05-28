@@ -1,0 +1,28 @@
+﻿Check,Value,Expected,Pass
+all_items_feature_and_story_criteria: total rows,371,371,TRUE
+all_items_feature_and_story_criteria: rows with exactly one title column populated,371,371,TRUE
+all_items_feature_and_story_criteria: rows with bracketed title prefixes,0,0,TRUE
+all_items_feature_and_story_criteria: Epic rows,9,9,TRUE
+all_items_feature_and_story_criteria: Feature rows,27,27,TRUE
+all_items_feature_and_story_criteria: User Story rows,97,97,TRUE
+all_items_feature_and_story_criteria: Task rows,238,238,TRUE
+all_items_feature_and_story_criteria: Feature Acceptance Criteria populated,27,27,TRUE
+all_items_feature_and_story_criteria: User Story Acceptance Criteria populated,97,97,TRUE
+all_items_story_criteria_only: total rows,371,371,TRUE
+all_items_story_criteria_only: rows with exactly one title column populated,371,371,TRUE
+all_items_story_criteria_only: rows with bracketed title prefixes,0,0,TRUE
+all_items_story_criteria_only: Epic rows,9,9,TRUE
+all_items_story_criteria_only: Feature rows,27,27,TRUE
+all_items_story_criteria_only: User Story rows,97,97,TRUE
+all_items_story_criteria_only: Task rows,238,238,TRUE
+all_items_story_criteria_only: Feature Acceptance Criteria populated,0,0 or varies,TRUE
+all_items_story_criteria_only: User Story Acceptance Criteria populated,97,97,TRUE
+pilot_branch: total rows,5,varies,TRUE
+pilot_branch: rows with exactly one title column populated,5,5,TRUE
+pilot_branch: rows with bracketed title prefixes,0,0,TRUE
+pilot_branch: Epic rows,1,varies,TRUE
+pilot_branch: Feature rows,1,varies,TRUE
+pilot_branch: User Story rows,1,varies,TRUE
+pilot_branch: Task rows,2,varies,TRUE
+pilot_branch: Feature Acceptance Criteria populated,1,0 or varies,TRUE
+pilot_branch: User Story Acceptance Criteria populated,1,varies,TRUE
