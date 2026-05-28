@@ -1,1 +1,86 @@
-data/
+# ClinicalPulse repository safety rules
+# Keep raw generated data, credentials, local database artifacts, and machine-specific files out of Git.
+
+# Environment variables and secrets
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.pfx
+*.crt
+*.cer
+*.p12
+secrets/
+config/secrets/
+connection_strings.json
+
+# Raw, interim, and processed data
+data/raw/
+data/interim/
+data/processed/
+
+# Generated data files
+*.csv
+*.csv.gz
+*.tsv
+*.parquet
+*.jsonl
+*.ndjson
+
+# Allow intentionally curated public-safe sample data
+!data/samples/
+!data/samples/**
+!data/samples/README.md
+
+# SQL Server local artifacts and backups
+*.bak
+*.trn
+*.mdf
+*.ldf
+*.ndf
+*.bacpac
+*.dacpac
+
+# Power BI local/reporting artifacts
+*.pbix
+*.pbit
+*.xlsx
+*.xls
+*.xlsm
+
+# Python caches and virtual environments
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+env/
+
+# Local application/runtime artifacts
+logs/
+*.log
+tmp/
+temp/
+.cache/
+
+# API/local development
+.coverage
+htmlcov/
+uvicorn*.log
+
+# IDE/editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Keep directory placeholders trackable where used
+!.gitkeep
