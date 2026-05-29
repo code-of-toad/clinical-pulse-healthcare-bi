@@ -221,10 +221,25 @@ GO
 USE [ClinicalPulse];
 GO
 
+/*
+    DECLARE creates variables.
+
+    Here, @bronze_tables is a table variable.
+    It behaves like a small temporary table that exists only while this script batch runs.
+
+    SYSNAME is a SQL Server system data type used for object names.
+    It is essentially NVARCHAR(128), commonly used for table names, schema names,
+    column names, constraint names, and other identifiers.
+*/
 DECLARE @bronze_tables TABLE (
     table_name SYSNAME NOT NULL PRIMARY KEY
 );
 
+/*
+    Store the bronze table names that should receive the metadata columns.
+
+    This avoids copy-pasting the same ALTER TABLE logic seven times.
+*/
 INSERT INTO @bronze_tables (table_name)
 VALUES
     (N'patients'),
@@ -235,30 +250,93 @@ VALUES
     (N'observations'),
     (N'procedures');
 
+/*
+    These scalar variables hold one table name at a time and one generated SQL command
+    at a time while the cursor loops through the bronze table list.
+*/
 DECLARE @table_name SYSNAME;
 DECLARE @sql NVARCHAR(MAX);
 
+/*
+    A cursor lets SQL Server loop through a result set row by row.
+
+    In this case, the cursor loops through the table names stored in @bronze_tables.
+
+    LOCAL means the cursor only exists in this script scope.
+    FAST_FORWARD means this is a simple read-only, forward-only cursor.
+*/
 DECLARE bronze_table_cursor CURSOR LOCAL FAST_FORWARD FOR
 SELECT table_name
 FROM @bronze_tables
 ORDER BY table_name;
 
+/*
+    OPEN activates the cursor so rows can be fetched from it.
+*/
 OPEN bronze_table_cursor;
 
+/*
+    FETCH NEXT gets the first table name from the cursor and stores it in @table_name.
+*/
 FETCH NEXT FROM bronze_table_cursor INTO @table_name;
 
+/*
+    @@FETCH_STATUS tells us whether the previous FETCH succeeded.
+
+    0 means the fetch was successful.
+    So this loop continues until there are no more table names to process.
+*/
 WHILE @@FETCH_STATUS = 0
 BEGIN
+    /*
+        COL_LENGTH checks whether a column exists on a table.
+
+        Syntax:
+            COL_LENGTH('schema.table', 'column_name')
+
+        If the column exists, SQL Server returns its length.
+        If the column does not exist, it returns NULL.
+
+        So this condition means:
+            If bronze.<current_table>.ingestion_batch_id does not exist, add it.
+    */
     IF COL_LENGTH(N'bronze.' + @table_name, N'ingestion_batch_id') IS NULL
     BEGIN
+        /*
+            Dynamic SQL means building a SQL command as text, then executing it.
+
+            We need dynamic SQL here because ALTER TABLE needs a table name,
+            and the table name changes on each loop iteration.
+
+            QUOTENAME safely wraps the table name in brackets.
+            Example:
+                patients becomes [patients]
+
+            This protects against invalid object names and is a good habit when
+            dynamically generating SQL object references.
+        */
         SET @sql = N'
             ALTER TABLE bronze.' + QUOTENAME(@table_name) + N'
             ADD ingestion_batch_id BIGINT NULL;
         ';
+
+        /*
+            sys.sp_executesql executes the SQL text stored in @sql.
+        */
         EXEC sys.sp_executesql @sql;
+
         PRINT 'Added ingestion_batch_id to bronze.' + @table_name + '.';
     END;
 
+    /*
+        Add ingestion_datetime if it does not already exist.
+
+        DATETIME2(0) stores date and time with seconds precision.
+        NOT NULL means every row must have a value.
+
+        DEFAULT SYSUTCDATETIME() automatically fills the column with the current
+        UTC date/time when a new row is inserted and no explicit value is provided.
+    */
     IF COL_LENGTH(N'bronze.' + @table_name, N'ingestion_datetime') IS NULL
     BEGIN
         SET @sql = N'
@@ -267,30 +345,55 @@ BEGIN
                 CONSTRAINT ' + QUOTENAME(N'df_' + @table_name + N'_ingestion_datetime') + N'
                 DEFAULT SYSUTCDATETIME();
         ';
+
         EXEC sys.sp_executesql @sql;
+
         PRINT 'Added ingestion_datetime to bronze.' + @table_name + '.';
     END;
 
+    /*
+        Add source_file if it does not already exist.
+
+        This column stores the CSV file name/path used for the loaded row.
+    */
     IF COL_LENGTH(N'bronze.' + @table_name, N'source_file') IS NULL
     BEGIN
         SET @sql = N'
             ALTER TABLE bronze.' + QUOTENAME(@table_name) + N'
             ADD source_file NVARCHAR(255) NULL;
         ';
+
         EXEC sys.sp_executesql @sql;
+
         PRINT 'Added source_file to bronze.' + @table_name + '.';
     END;
 
+    /*
+        Add row_hash if it does not already exist.
+
+        VARBINARY(32) is appropriate for a 256-bit hash value, such as SHA2_256.
+        This can later help detect row-level changes or duplicates.
+    */
     IF COL_LENGTH(N'bronze.' + @table_name, N'row_hash') IS NULL
     BEGIN
         SET @sql = N'
             ALTER TABLE bronze.' + QUOTENAME(@table_name) + N'
             ADD row_hash VARBINARY(32) NULL;
         ';
+
         EXEC sys.sp_executesql @sql;
+
         PRINT 'Added row_hash to bronze.' + @table_name + '.';
     END;
 
+    /*
+        Add load_status if it does not already exist.
+
+        This records the ingestion status for the row.
+
+        The default constraint automatically sets load_status to 'loaded'
+        unless the ingestion script provides a different value.
+    */
     IF COL_LENGTH(N'bronze.' + @table_name, N'load_status') IS NULL
     BEGIN
         SET @sql = N'
@@ -299,13 +402,26 @@ BEGIN
                 CONSTRAINT ' + QUOTENAME(N'df_' + @table_name + N'_load_status') + N'
                 DEFAULT N''loaded'';
         ';
+
         EXEC sys.sp_executesql @sql;
+
         PRINT 'Added load_status to bronze.' + @table_name + '.';
     END;
 
+    /*
+        Move to the next table name in the cursor.
+        Without this FETCH NEXT, the loop would never advance.
+    */
     FETCH NEXT FROM bronze_table_cursor INTO @table_name;
 END;
 
+/*
+    CLOSE releases the cursor's active result set.
+*/
 CLOSE bronze_table_cursor;
+
+/*
+    DEALLOCATE removes the cursor definition from memory.
+*/
 DEALLOCATE bronze_table_cursor;
 GO
