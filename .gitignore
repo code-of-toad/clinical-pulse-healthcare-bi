@@ -1,6 +1,9 @@
 # ClinicalPulse repository safety rules
 # Keep raw generated data, credentials, local database artifacts, and machine-specific files out of Git.
 
+# User
+_____*
+
 # Environment variables and secrets
 .env
 .env.*
