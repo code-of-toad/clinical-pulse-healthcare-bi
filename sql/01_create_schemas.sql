@@ -105,22 +105,3 @@ BEGIN
     PRINT 'Schema api already exists.';
 END;
 GO
-
-/*---------------------------------------------------------------------------*/
-SELECT name
-FROM sys.databases
-WHERE name = N'ClinicalPulse'
-
-USE [ClinicalPulse];
-
-SELECT name AS schema_name
-FROM sys.schemas
-WHERE name IN (
-    N'bronze',
-    N'silver',
-    N'gold',
-    N'governance',
-    N'audit',
-    N'api'
-)
-ORDER BY name;
