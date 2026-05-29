@@ -11,6 +11,8 @@
     - bronze.providers
     - bronze.encounters
     - bronze.conditions
+    - bronze.observations
+    - bronze.procedures
 
     Assumptions:
     - These bronze tables are source-preserving staging tables for Synthea CSV data.
@@ -155,5 +157,48 @@ END
 ELSE
 BEGIN
     PRINT 'bronze.conditions already exists.';
+END;
+GO
+
+IF OBJECT_ID(N'bronze.observations', N'U') IS NULL
+BEGIN
+    CREATE TABLE bronze.observations (
+        observation_datetime NVARCHAR(50) NULL,
+        source_patient_id NVARCHAR(100) NULL,
+        source_encounter_id NVARCHAR(100) NULL,
+        observation_category NVARCHAR(100) NULL,
+        observation_code NVARCHAR(100) NULL,
+        observation_description NVARCHAR(255) NULL,
+        observation_value NVARCHAR(255) NULL,
+        observation_units NVARCHAR(100) NULL,
+        observation_type NVARCHAR(100) NULL
+    );
+
+    PRINT 'Created bronze.observations.';
+END
+ELSE
+BEGIN
+    PRINT 'bronze.observations already exists.';
+END;
+GO
+
+IF OBJECT_ID(N'bronze.procedures', N'U') IS NULL
+BEGIN
+    CREATE TABLE bronze.procedures (
+        procedure_datetime NVARCHAR(50) NULL,
+        source_patient_id NVARCHAR(100) NULL,
+        source_encounter_id NVARCHAR(100) NULL,
+        procedure_code NVARCHAR(100) NULL,
+        procedure_description NVARCHAR(255) NULL,
+        base_procedure_cost NVARCHAR(50) NULL,
+        reason_code NVARCHAR(100) NULL,
+        reason_description NVARCHAR(255) NULL
+    );
+
+    PRINT 'Created bronze.procedures.';
+END
+ELSE
+BEGIN
+    PRINT 'bronze.procedures already exists.';
 END;
 GO
