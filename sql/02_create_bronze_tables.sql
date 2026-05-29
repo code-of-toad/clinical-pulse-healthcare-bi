@@ -202,3 +202,110 @@ BEGIN
     PRINT 'bronze.procedures already exists.';
 END;
 GO
+
+/*
+    Add ingestion metadata columns to bronze tables.
+
+    Purpose:
+    Add standard ingestion metadata columns to bronze tables so each loaded row
+    can be traced to its source file, ingestion batch, load timestamp, row hash,
+    and load status.
+
+    Assumptions:
+    - ingestion_batch_id will link to an audit batch table created in a later story.
+    - source_file will be populated by the ingestion script.
+    - row_hash will be populated by the ingestion script.
+    - load_status defaults to 'loaded' unless the ingestion process sets another status.
+*/
+
+USE [ClinicalPulse];
+GO
+
+DECLARE @bronze_tables TABLE (
+    table_name SYSNAME NOT NULL PRIMARY KEY
+);
+
+INSERT INTO @bronze_tables (table_name)
+VALUES
+    (N'patients'),
+    (N'organizations'),
+    (N'providers'),
+    (N'encounters'),
+    (N'conditions'),
+    (N'observations'),
+    (N'procedures');
+
+DECLARE @table_name SYSNAME;
+DECLARE @sql NVARCHAR(MAX);
+
+DECLARE bronze_table_cursor CURSOR LOCAL FAST_FORWARD FOR
+SELECT table_name
+FROM @bronze_tables
+ORDER BY table_name;
+
+OPEN bronze_table_cursor;
+
+FETCH NEXT FROM bronze_table_cursor INTO @table_name;
+
+WHILE @@FETCH_STATUS = 0
+BEGIN
+    IF COL_LENGTH(N'bronze.' + @table_name, N'ingestion_batch_id') IS NULL
+    BEGIN
+        SET @sql = N'
+            ALTER TABLE bronze.' + QUOTENAME(@table_name) + N'
+            ADD ingestion_batch_id BIGINT NULL;
+        ';
+        EXEC sys.sp_executesql @sql;
+        PRINT 'Added ingestion_batch_id to bronze.' + @table_name + '.';
+    END;
+
+    IF COL_LENGTH(N'bronze.' + @table_name, N'ingestion_datetime') IS NULL
+    BEGIN
+        SET @sql = N'
+            ALTER TABLE bronze.' + QUOTENAME(@table_name) + N'
+            ADD ingestion_datetime DATETIME2(0) NOT NULL
+                CONSTRAINT ' + QUOTENAME(N'df_' + @table_name + N'_ingestion_datetime') + N'
+                DEFAULT SYSUTCDATETIME();
+        ';
+        EXEC sys.sp_executesql @sql;
+        PRINT 'Added ingestion_datetime to bronze.' + @table_name + '.';
+    END;
+
+    IF COL_LENGTH(N'bronze.' + @table_name, N'source_file') IS NULL
+    BEGIN
+        SET @sql = N'
+            ALTER TABLE bronze.' + QUOTENAME(@table_name) + N'
+            ADD source_file NVARCHAR(255) NULL;
+        ';
+        EXEC sys.sp_executesql @sql;
+        PRINT 'Added source_file to bronze.' + @table_name + '.';
+    END;
+
+    IF COL_LENGTH(N'bronze.' + @table_name, N'row_hash') IS NULL
+    BEGIN
+        SET @sql = N'
+            ALTER TABLE bronze.' + QUOTENAME(@table_name) + N'
+            ADD row_hash VARBINARY(32) NULL;
+        ';
+        EXEC sys.sp_executesql @sql;
+        PRINT 'Added row_hash to bronze.' + @table_name + '.';
+    END;
+
+    IF COL_LENGTH(N'bronze.' + @table_name, N'load_status') IS NULL
+    BEGIN
+        SET @sql = N'
+            ALTER TABLE bronze.' + QUOTENAME(@table_name) + N'
+            ADD load_status NVARCHAR(30) NOT NULL
+                CONSTRAINT ' + QUOTENAME(N'df_' + @table_name + N'_load_status') + N'
+                DEFAULT N''loaded'';
+        ';
+        EXEC sys.sp_executesql @sql;
+        PRINT 'Added load_status to bronze.' + @table_name + '.';
+    END;
+
+    FETCH NEXT FROM bronze_table_cursor INTO @table_name;
+END;
+
+CLOSE bronze_table_cursor;
+DEALLOCATE bronze_table_cursor;
+GO
