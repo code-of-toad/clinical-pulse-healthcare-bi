@@ -8,7 +8,7 @@ Assumptions:
 - Bronze tables already exist.
 - Ingestion metadata columns already exist on bronze tables.
 - Raw Synthea CSV files are stored locally under data/raw/synthea/.
-- This script does not write audit tables yet; audit logging is handled by User Story 1477.
+- This script writes batch-level and file-level ingestion logs to audit tables.
 """
 
 from __future__ import annotations
@@ -267,6 +267,160 @@ def clear_bronze_table(engine: Engine, table_name: str) -> None:
         connection.execute(text(f'DELETE FROM bronze.{table_name};'))
 
 
+def truncate_error_message(error: Exception) -> str:
+    """Return a database-safe error message."""
+
+    return str(error)[:4000]
+
+
+def start_ingestion_batch(
+    engine: Engine,
+    raw_dir: Path,
+    mode: str,
+    entities: list[str],
+) -> int:
+    """Create an audit batch row and return its generated batch ID."""
+
+    statement = text(
+        """
+        INSERT INTO audit.ingestion_batch (
+            source_system,
+            raw_directory,
+            ingestion_mode,
+            entity_count,
+            load_status
+        )
+        OUTPUT INSERTED.ingestion_batch_id
+        VALUES (
+            :source_system,
+            :raw_directory,
+            :ingestion_mode,
+            :entity_count,
+            N'running'
+        );
+        """
+    )
+
+    with engine.begin() as connection:
+        batch_id = connection.execute(
+            statement,
+            {
+                'source_system': 'Synthea CSV',
+                'raw_directory': str(raw_dir),
+                'ingestion_mode': mode,
+                'entity_count': len(entities),
+            },
+        ).scalar_one()
+
+    return int(batch_id)
+
+
+def complete_ingestion_batch(
+    engine: Engine,
+    batch_id: int,
+    load_status: str,
+    total_rows_loaded: int,
+    error_message: str | None = None,
+) -> None:
+    """Mark an audit batch as succeeded or failed."""
+
+    statement = text(
+        """
+        UPDATE audit.ingestion_batch
+        SET
+            completed_at = SYSUTCDATETIME(),
+            load_status = :load_status,
+            total_rows_loaded = :total_rows_loaded,
+            error_message = :error_message
+        WHERE ingestion_batch_id = :ingestion_batch_id;
+        """
+    )
+
+    with engine.begin() as connection:
+        connection.execute(
+            statement,
+            {
+                'ingestion_batch_id': batch_id,
+                'load_status': load_status,
+                'total_rows_loaded': total_rows_loaded,
+                'error_message': error_message,
+            },
+        )
+
+
+def start_ingestion_file_log(
+    engine: Engine,
+    batch_id: int,
+    config: TableConfig,
+) -> int:
+    """Create an audit file-log row and return its generated log ID."""
+
+    statement = text(
+        """
+        INSERT INTO audit.ingestion_file_log (
+            ingestion_batch_id,
+            source_file,
+            target_schema,
+            target_table,
+            load_status
+        )
+        OUTPUT INSERTED.ingestion_file_log_id
+        VALUES (
+            :ingestion_batch_id,
+            :source_file,
+            N'bronze',
+            :target_table,
+            N'running'
+        );
+        """
+    )
+
+    with engine.begin() as connection:
+        file_log_id = connection.execute(
+            statement,
+            {
+                'ingestion_batch_id': batch_id,
+                'source_file': config.source_file,
+                'target_table': config.target_table,
+            },
+        ).scalar_one()
+
+    return int(file_log_id)
+
+
+def complete_ingestion_file_log(
+    engine: Engine,
+    file_log_id: int,
+    load_status: str,
+    rows_loaded: int,
+    error_message: str | None = None,
+) -> None:
+    """Mark an audit file-log row as succeeded or failed."""
+
+    statement = text(
+        """
+        UPDATE audit.ingestion_file_log
+        SET
+            completed_at = SYSUTCDATETIME(),
+            load_status = :load_status,
+            rows_loaded = :rows_loaded,
+            error_message = :error_message
+        WHERE ingestion_file_log_id = :ingestion_file_log_id;
+        """
+    )
+
+    with engine.begin() as connection:
+        connection.execute(
+            statement,
+            {
+                'ingestion_file_log_id': file_log_id,
+                'load_status': load_status,
+                'rows_loaded': rows_loaded,
+                'error_message': error_message,
+            },
+        )
+
+
 def load_bronze_table(
     engine: Engine,
     config: TableConfig,
@@ -341,7 +495,13 @@ def main() -> None:
 
     args = parse_args()
     engine = get_sqlalchemy_engine()
-    batch_id = int(time.time())
+
+    batch_id = start_ingestion_batch(
+        engine=engine,
+        raw_dir=args.raw_dir,
+        mode=args.mode,
+        entities=args.entities,
+    )
 
     print(f'ClinicalPulse Synthea ingestion started. Batch ID: {batch_id}')
     print(f'Raw directory: {args.raw_dir}')
@@ -349,23 +509,64 @@ def main() -> None:
 
     total_rows = 0
 
-    for entity in args.entities:
-        config = TABLE_CONFIGS[entity]
+    try:
+        for entity in args.entities:
+            config = TABLE_CONFIGS[entity]
 
-        row_count = load_bronze_table(
+            file_log_id = start_ingestion_file_log(
+                engine=engine,
+                batch_id=batch_id,
+                config=config,
+            )
+
+            try:
+                row_count = load_bronze_table(
+                    engine=engine,
+                    config=config,
+                    raw_dir=args.raw_dir,
+                    batch_id=batch_id,
+                    mode=args.mode,
+                )
+            except Exception as error:
+                complete_ingestion_file_log(
+                    engine=engine,
+                    file_log_id=file_log_id,
+                    load_status='failed',
+                    rows_loaded=0,
+                    error_message=truncate_error_message(error),
+                )
+                raise
+
+            complete_ingestion_file_log(
+                engine=engine,
+                file_log_id=file_log_id,
+                load_status='succeeded',
+                rows_loaded=row_count,
+            )
+
+            total_rows += row_count
+
+            print(
+                f'Loaded {row_count} row(s) from {config.source_file} '
+                f'into bronze.{config.target_table}.'
+            )
+
+    except Exception as error:
+        complete_ingestion_batch(
             engine=engine,
-            config=config,
-            raw_dir=args.raw_dir,
             batch_id=batch_id,
-            mode=args.mode,
+            load_status='failed',
+            total_rows_loaded=total_rows,
+            error_message=truncate_error_message(error),
         )
+        raise
 
-        total_rows += row_count
-
-        print(
-            f'Loaded {row_count} row(s) from {config.source_file} '
-            f'into bronze.{config.target_table}.'
-        )
+    complete_ingestion_batch(
+        engine=engine,
+        batch_id=batch_id,
+        load_status='succeeded',
+        total_rows_loaded=total_rows,
+    )
 
     print(f'ClinicalPulse Synthea ingestion completed. Total rows loaded: {total_rows}')
 
