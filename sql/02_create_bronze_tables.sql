@@ -34,6 +34,7 @@ BEGIN
         passport NVARCHAR(50) NULL,
         prefix NVARCHAR(50) NULL,
         first_name NVARCHAR(100) NULL,
+        middle_name NVARCHAR(100) NULL,
         last_name NVARCHAR(100) NULL,
         suffix NVARCHAR(50) NULL,
         maiden NVARCHAR(100) NULL,
@@ -101,7 +102,8 @@ BEGIN
         zip NVARCHAR(20) NULL,
         lat NVARCHAR(50) NULL,
         lon NVARCHAR(50) NULL,
-        utilization NVARCHAR(50) NULL
+        encounter_count NVARCHAR(50) NULL,
+        procedure_count NVARCHAR(50) NULL
     );
 
     PRINT 'Created bronze.providers.';
@@ -184,10 +186,12 @@ GO
 
 IF OBJECT_ID(N'bronze.procedures', N'U') IS NULL
 BEGIN
-    CREATE TABLE bronze.procedures (
-        procedure_datetime NVARCHAR(50) NULL,
+        CREATE TABLE bronze.procedures (
+        procedure_start_datetime NVARCHAR(50) NULL,
+        procedure_stop_datetime NVARCHAR(50) NULL,
         source_patient_id NVARCHAR(100) NULL,
         source_encounter_id NVARCHAR(100) NULL,
+        procedure_system NVARCHAR(255) NULL,
         procedure_code NVARCHAR(100) NULL,
         procedure_description NVARCHAR(255) NULL,
         base_procedure_cost NVARCHAR(50) NULL,
