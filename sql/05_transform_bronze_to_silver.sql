@@ -1,3 +1,36 @@
+/*
+ClinicalPulse bronze-to-silver lineage contract
+
+Every silver table produced by this script must preserve enough metadata
+to trace each silver record back to its bronze source record.
+
+Required silver lineage fields:
+    source_system
+    source_entity
+    bronze_ingestion_batch_id
+    bronze_ingestion_datetime
+    bronze_source_file
+    bronze_row_hash
+    bronze_load_status
+    silver_load_datetime
+
+Primary trace pattern:
+    silver.bronze_ingestion_batch_id = bronze.ingestion_batch_id
+    silver.bronze_source_file = bronze.source_file
+    silver.bronze_row_hash = bronze.row_hash
+
+Where natural source identifiers exist, they are also standardized:
+    bronze.patients.source_patient_id -> silver.patient.patient_id
+    bronze.encounters.source_encounter_id -> silver.encounter.encounter_id
+    bronze source_patient_id -> patient_id references
+    bronze source_encounter_id -> encounter_id references
+
+Notes:
+    - row_hash is VARBINARY(32), matching bronze.
+    - load_status is retained for traceability but is not a business-quality status.
+    - silver_load_datetime records when the silver transform was run.
+*/
+
 USE ClinicalPulse;
 GO
 
