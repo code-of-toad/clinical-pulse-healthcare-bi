@@ -26,34 +26,34 @@ GO
 IF OBJECT_ID(N'bronze.patients', N'U') IS NULL
 BEGIN
     CREATE TABLE bronze.patients (
-        source_patient_id NVARCHAR(100) NULL,
-        birthdate NVARCHAR(50) NULL,
-        deathdate NVARCHAR(50) NULL,
-        ssn NVARCHAR(50) NULL,
-        drivers NVARCHAR(50) NULL,
-        passport NVARCHAR(50) NULL,
-        prefix NVARCHAR(50) NULL,
-        first_name NVARCHAR(100) NULL,
-        middle_name NVARCHAR(100) NULL,
-        last_name NVARCHAR(100) NULL,
-        suffix NVARCHAR(50) NULL,
-        maiden NVARCHAR(100) NULL,
-        marital NVARCHAR(50) NULL,
-        race NVARCHAR(100) NULL,
-        ethnicity NVARCHAR(100) NULL,
-        gender NVARCHAR(50) NULL,
-        birthplace NVARCHAR(255) NULL,
-        street_address NVARCHAR(255) NULL,
-        city NVARCHAR(100) NULL,
-        state_code NVARCHAR(100) NULL,
-        county NVARCHAR(100) NULL,
-        fips NVARCHAR(50) NULL,
-        zip NVARCHAR(20) NULL,
-        lat NVARCHAR(50) NULL,
-        lon NVARCHAR(50) NULL,
-        healthcare_expenses NVARCHAR(50) NULL,
-        healthcare_coverage NVARCHAR(50) NULL,
-        income NVARCHAR(50) NULL
+        source_patient_id   NVARCHAR(100) NULL,
+        birthdate           NVARCHAR(50)  NULL,
+        deathdate           NVARCHAR(50)  NULL,
+        ssn                 NVARCHAR(50)  NULL,
+        drivers             NVARCHAR(50)  NULL,
+        passport            NVARCHAR(50)  NULL,
+        prefix              NVARCHAR(50)  NULL,
+        first_name          NVARCHAR(100) NULL,
+        middle_name         NVARCHAR(100) NULL,
+        last_name           NVARCHAR(100) NULL,
+        suffix              NVARCHAR(50)  NULL,
+        maiden              NVARCHAR(100) NULL,
+        marital             NVARCHAR(50)  NULL,
+        race                NVARCHAR(100) NULL,
+        ethnicity           NVARCHAR(100) NULL,
+        gender              NVARCHAR(50)  NULL,
+        birthplace          NVARCHAR(255) NULL,
+        street_address      NVARCHAR(255) NULL,
+        city                NVARCHAR(100) NULL,
+        state_code          NVARCHAR(100) NULL,
+        county              NVARCHAR(100) NULL,
+        fips                NVARCHAR(50)  NULL,
+        zip                 NVARCHAR(20)  NULL,
+        lat                 NVARCHAR(50)  NULL,
+        lon                 NVARCHAR(50)  NULL,
+        healthcare_expenses NVARCHAR(50)  NULL,
+        healthcare_coverage NVARCHAR(50)  NULL,
+        income              NVARCHAR(50)  NULL
     );
 
     PRINT 'Created bronze.patients.';
@@ -68,16 +68,16 @@ IF OBJECT_ID(N'bronze.organizations', N'U') IS NULL
 BEGIN
     CREATE TABLE bronze.organizations (
         source_organization_id NVARCHAR(100) NULL,
-        organization_name NVARCHAR(255) NULL,
-        street_address NVARCHAR(255) NULL,
-        city NVARCHAR(100) NULL,
-        state_code NVARCHAR(100) NULL,
-        zip NVARCHAR(20) NULL,
-        lat NVARCHAR(50) NULL,
-        lon NVARCHAR(50) NULL,
-        phone NVARCHAR(50) NULL,
-        revenue NVARCHAR(50) NULL,
-        utilization NVARCHAR(50) NULL
+        organization_name      NVARCHAR(255) NULL,
+        street_address         NVARCHAR(255) NULL,
+        city                   NVARCHAR(100) NULL,
+        state_code             NVARCHAR(100) NULL,
+        zip                    NVARCHAR(20)  NULL,
+        lat                    NVARCHAR(50)  NULL,
+        lon                    NVARCHAR(50)  NULL,
+        phone                  NVARCHAR(50)  NULL,
+        revenue                NVARCHAR(50)  NULL,
+        utilization            NVARCHAR(50)  NULL
     );
 
     PRINT 'Created bronze.organizations.';
@@ -91,19 +91,19 @@ GO
 IF OBJECT_ID(N'bronze.providers', N'U') IS NULL
 BEGIN
     CREATE TABLE bronze.providers (
-        source_provider_id NVARCHAR(100) NULL,
+        source_provider_id     NVARCHAR(100) NULL,
         source_organization_id NVARCHAR(100) NULL,
-        provider_name NVARCHAR(255) NULL,
-        gender NVARCHAR(50) NULL,
-        speciality NVARCHAR(255) NULL,
-        street_address NVARCHAR(255) NULL,
-        city NVARCHAR(100) NULL,
-        state_code NVARCHAR(100) NULL,
-        zip NVARCHAR(20) NULL,
-        lat NVARCHAR(50) NULL,
-        lon NVARCHAR(50) NULL,
-        encounter_count NVARCHAR(50) NULL,
-        procedure_count NVARCHAR(50) NULL
+        provider_name          NVARCHAR(255) NULL,
+        gender                 NVARCHAR(50)  NULL,
+        speciality             NVARCHAR(255) NULL,
+        street_address         NVARCHAR(255) NULL,
+        city                   NVARCHAR(100) NULL,
+        state_code             NVARCHAR(100) NULL,
+        zip                    NVARCHAR(20)  NULL,
+        lat                    NVARCHAR(50)  NULL,
+        lon                    NVARCHAR(50)  NULL,
+        encounter_count        NVARCHAR(50)  NULL,
+        procedure_count        NVARCHAR(50)  NULL
     );
 
     PRINT 'Created bronze.providers.';
@@ -117,21 +117,21 @@ GO
 IF OBJECT_ID(N'bronze.encounters', N'U') IS NULL
 BEGIN
     CREATE TABLE bronze.encounters (
-        source_encounter_id NVARCHAR(100) NULL,
-        encounter_start_datetime NVARCHAR(50) NULL,
-        encounter_stop_datetime NVARCHAR(50) NULL,
-        source_patient_id NVARCHAR(100) NULL,
-        source_organization_id NVARCHAR(100) NULL,
-        source_provider_id NVARCHAR(100) NULL,
-        source_payer_id NVARCHAR(100) NULL,
-        encounter_class NVARCHAR(100) NULL,
-        encounter_code NVARCHAR(100) NULL,
-        encounter_description NVARCHAR(255) NULL,
-        base_encounter_cost NVARCHAR(50) NULL,
-        total_claim_cost NVARCHAR(50) NULL,
-        payer_coverage NVARCHAR(50) NULL,
-        reason_code NVARCHAR(100) NULL,
-        reason_description NVARCHAR(255) NULL
+        source_encounter_id      NVARCHAR(100) NULL,
+        encounter_start_datetime NVARCHAR(50)  NULL,
+        encounter_stop_datetime  NVARCHAR(50)  NULL,
+        source_patient_id        NVARCHAR(100) NULL,
+        source_organization_id   NVARCHAR(100) NULL,
+        source_provider_id       NVARCHAR(100) NULL,
+        source_payer_id          NVARCHAR(100) NULL,
+        encounter_class          NVARCHAR(100) NULL,
+        encounter_code           NVARCHAR(100) NULL,
+        encounter_description    NVARCHAR(255) NULL,
+        base_encounter_cost      NVARCHAR(50)  NULL,
+        total_claim_cost         NVARCHAR(50)  NULL,
+        payer_coverage           NVARCHAR(50)  NULL,
+        reason_code              NVARCHAR(100) NULL,
+        reason_description       NVARCHAR(255) NULL
     );
 
     PRINT 'Created bronze.encounters.';
@@ -145,13 +145,13 @@ GO
 IF OBJECT_ID(N'bronze.conditions', N'U') IS NULL
 BEGIN
     CREATE TABLE bronze.conditions (
-        condition_start_datetime NVARCHAR(50) NULL,
-        condition_stop_datetime NVARCHAR(50) NULL,
-        source_patient_id NVARCHAR(100) NULL,
-        source_encounter_id NVARCHAR(100) NULL,
-        condition_system NVARCHAR(255) NULL,
-        condition_code NVARCHAR(100) NULL,
-        condition_description NVARCHAR(255) NULL
+        condition_start_datetime NVARCHAR(50)  NULL,
+        condition_stop_datetime  NVARCHAR(50)  NULL,
+        source_patient_id        NVARCHAR(100) NULL,
+        source_encounter_id      NVARCHAR(100) NULL,
+        condition_system         NVARCHAR(255) NULL,
+        condition_code           NVARCHAR(100) NULL,
+        condition_description    NVARCHAR(255) NULL
     );
 
     PRINT 'Created bronze.conditions.';
@@ -165,15 +165,15 @@ GO
 IF OBJECT_ID(N'bronze.observations', N'U') IS NULL
 BEGIN
     CREATE TABLE bronze.observations (
-        observation_datetime NVARCHAR(50) NULL,
-        source_patient_id NVARCHAR(100) NULL,
-        source_encounter_id NVARCHAR(100) NULL,
-        observation_category NVARCHAR(100) NULL,
-        observation_code NVARCHAR(100) NULL,
+        observation_datetime    NVARCHAR(50)  NULL,
+        source_patient_id       NVARCHAR(100) NULL,
+        source_encounter_id     NVARCHAR(100) NULL,
+        observation_category    NVARCHAR(100) NULL,
+        observation_code        NVARCHAR(100) NULL,
         observation_description NVARCHAR(255) NULL,
-        observation_value NVARCHAR(255) NULL,
-        observation_units NVARCHAR(100) NULL,
-        observation_type NVARCHAR(100) NULL
+        observation_value       NVARCHAR(255) NULL,
+        observation_units       NVARCHAR(100) NULL,
+        observation_type        NVARCHAR(100) NULL
     );
 
     PRINT 'Created bronze.observations.';
@@ -187,16 +187,16 @@ GO
 IF OBJECT_ID(N'bronze.procedures', N'U') IS NULL
 BEGIN
         CREATE TABLE bronze.procedures (
-        procedure_start_datetime NVARCHAR(50) NULL,
-        procedure_stop_datetime NVARCHAR(50) NULL,
-        source_patient_id NVARCHAR(100) NULL,
-        source_encounter_id NVARCHAR(100) NULL,
-        procedure_system NVARCHAR(255) NULL,
-        procedure_code NVARCHAR(100) NULL,
-        procedure_description NVARCHAR(255) NULL,
-        base_procedure_cost NVARCHAR(50) NULL,
-        reason_code NVARCHAR(100) NULL,
-        reason_description NVARCHAR(255) NULL
+        procedure_start_datetime NVARCHAR(50)  NULL,
+        procedure_stop_datetime  NVARCHAR(50)  NULL,
+        source_patient_id        NVARCHAR(100) NULL,
+        source_encounter_id      NVARCHAR(100) NULL,
+        procedure_system         NVARCHAR(255) NULL,
+        procedure_code           NVARCHAR(100) NULL,
+        procedure_description    NVARCHAR(255) NULL,
+        base_procedure_cost      NVARCHAR(50)  NULL,
+        reason_code              NVARCHAR(100) NULL,
+        reason_description       NVARCHAR(255) NULL
     );
 
     PRINT 'Created bronze.procedures.';
@@ -206,6 +206,12 @@ BEGIN
     PRINT 'bronze.procedures already exists.';
 END;
 GO
+
+
+/*---------------------------------------------------------------------------*/
+/*---------------------------------------------------------------------------*/
+/*---------------------------------------------------------------------------*/
+
 
 /*
     Add ingestion metadata columns to bronze tables.
