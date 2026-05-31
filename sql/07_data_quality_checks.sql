@@ -685,6 +685,141 @@ WITH check_result AS (
     FROM silver.observation o
     LEFT JOIN silver.encounter e
         ON o.encounter_id = e.encounter_id
+    
+    UNION ALL
+
+    SELECT
+        'DQ_PATIENT_AGE_VALID',
+        COUNT_BIG(*),
+        SUM(
+            CASE
+                WHEN age_years < 0 THEN 1
+                WHEN patient_date_quality_status = 'valid' AND age_years IS NULL THEN 1
+                ELSE 0
+            END
+        )
+    FROM silver.patient
+
+    UNION ALL
+
+    SELECT
+        'DQ_ENCOUNTER_DATES_VALID',
+        COUNT_BIG(*),
+        SUM(
+            CASE
+                WHEN encounter_datetime_quality_status <> 'valid' THEN 1
+                WHEN encounter_duration_minutes < 0 THEN 1
+                WHEN encounter_duration_hours < 0 THEN 1
+                WHEN length_of_stay_days < 0 THEN 1
+                ELSE 0
+            END
+        )
+    FROM silver.encounter
+
+    UNION ALL
+
+    SELECT
+        'DQ_CONDITION_DATES_VALID',
+        COUNT_BIG(*),
+        SUM(
+            CASE
+                WHEN condition_date_quality_status <> 'valid' THEN 1
+                WHEN condition_duration_days < 0 THEN 1
+                ELSE 0
+            END
+        )
+    FROM silver.condition
+
+    UNION ALL
+
+    SELECT
+        'DQ_PROCEDURE_DATES_VALID',
+        COUNT_BIG(*),
+        SUM(
+            CASE
+                WHEN procedure_datetime_quality_status <> 'valid' THEN 1
+                WHEN procedure_duration_minutes < 0 THEN 1
+                WHEN procedure_duration_hours < 0 THEN 1
+                ELSE 0
+            END
+        )
+    FROM silver.[procedure]
+
+    UNION ALL
+
+    SELECT
+        'DQ_ENCOUNTER_CLASS_CONSISTENT',
+        COUNT_BIG(*),
+        SUM(
+            CASE
+                WHEN encounter_class IS NULL THEN 1
+                WHEN encounter_class <> LOWER(encounter_class) THEN 1
+                ELSE 0
+            END
+        )
+    FROM silver.encounter
+
+    UNION ALL
+
+    SELECT
+        'DQ_OBSERVATION_CATEGORY_CONSISTENT',
+        COUNT_BIG(*),
+        SUM(
+            CASE
+                WHEN observation_category IS NULL THEN 1
+                WHEN observation_category <> LOWER(observation_category) THEN 1
+                ELSE 0
+            END
+        )
+    FROM silver.observation
+
+    UNION ALL
+
+    SELECT
+        'DQ_SILVER_LOAD_FRESHNESS',
+        COUNT_BIG(*),
+        SUM(
+            CASE
+                WHEN latest_silver_load_datetime IS NULL THEN 1
+                WHEN latest_bronze_ingestion_datetime IS NULL THEN 1
+                WHEN latest_silver_load_datetime < latest_bronze_ingestion_datetime THEN 1
+                ELSE 0
+            END
+        )
+    FROM (
+        SELECT
+            'patient' AS table_name,
+            (SELECT MAX(silver_load_datetime) FROM silver.patient) AS latest_silver_load_datetime,
+            (SELECT MAX(ingestion_datetime) FROM bronze.patients) AS latest_bronze_ingestion_datetime
+
+        UNION ALL
+
+        SELECT
+            'encounter',
+            (SELECT MAX(silver_load_datetime) FROM silver.encounter),
+            (SELECT MAX(ingestion_datetime) FROM bronze.encounters)
+
+        UNION ALL
+
+        SELECT
+            'condition',
+            (SELECT MAX(silver_load_datetime) FROM silver.condition),
+            (SELECT MAX(ingestion_datetime) FROM bronze.conditions)
+
+        UNION ALL
+
+        SELECT
+            'procedure',
+            (SELECT MAX(silver_load_datetime) FROM silver.[procedure]),
+            (SELECT MAX(ingestion_datetime) FROM bronze.procedures)
+
+        UNION ALL
+
+        SELECT
+            'observation',
+            (SELECT MAX(silver_load_datetime) FROM silver.observation),
+            (SELECT MAX(ingestion_datetime) FROM bronze.observations)
+    ) freshness_check
 )
 SELECT
     qr.quality_rule_id,

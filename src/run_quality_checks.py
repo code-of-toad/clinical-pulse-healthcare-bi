@@ -34,14 +34,20 @@ FROM governance.vw_quality_check_current
 WHERE quality_dimension IN (
     'completeness',
     'uniqueness',
-    'referential_integrity'
+    'referential_integrity',
+    'validity',
+    'consistency',
+    'freshness'
 )
 ORDER BY
     CASE quality_dimension
         WHEN 'completeness' THEN 1
         WHEN 'uniqueness' THEN 2
         WHEN 'referential_integrity' THEN 3
-        ELSE 4
+        WHEN 'validity' THEN 4
+        WHEN 'consistency' THEN 5
+        WHEN 'freshness' THEN 6
+        ELSE 7
     END,
     quality_rule_id;
 '''
