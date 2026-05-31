@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+import uuid
 from pathlib import Path
 from typing import Any
 
@@ -22,7 +23,10 @@ SELECT
     quality_rule_id,
     rule_name,
     quality_dimension,
+    target_schema,
     target_table,
+    target_column,
+    rule_scope,
     severity,
     total_records,
     failed_records,
@@ -50,6 +54,46 @@ ORDER BY
         ELSE 7
     END,
     quality_rule_id;
+'''
+
+
+INSERT_QUALITY_RESULT = '''
+INSERT INTO governance.quality_check_result (
+    quality_check_run_id,
+    quality_rule_id,
+    rule_name,
+    quality_dimension,
+    target_schema,
+    target_table,
+    target_column,
+    rule_scope,
+    severity,
+    total_records,
+    failed_records,
+    passed_records,
+    pass_rate,
+    check_status,
+    checked_datetime,
+    run_source
+)
+VALUES (
+    :quality_check_run_id,
+    :quality_rule_id,
+    :rule_name,
+    :quality_dimension,
+    :target_schema,
+    :target_table,
+    :target_column,
+    :rule_scope,
+    :severity,
+    :total_records,
+    :failed_records,
+    :passed_records,
+    :pass_rate,
+    :check_status,
+    :checked_datetime,
+    :run_source
+);
 '''
 
 
@@ -98,7 +142,27 @@ def print_results(rows: list[dict[str, Any]]) -> None:
         )
 
 
-def run_quality_checks(fail_on_error: bool) -> int:
+def persist_results(rows: list[dict[str, Any]]) -> str:
+    quality_check_run_id = str(uuid.uuid4())
+
+    insert_rows = [
+        {
+            **row,
+            'quality_check_run_id': quality_check_run_id,
+            'run_source': 'src/run_quality_checks.py',
+        }
+        for row in rows
+    ]
+
+    engine = get_sqlalchemy_engine()
+
+    with engine.begin() as connection:
+        connection.execute(text(INSERT_QUALITY_RESULT), insert_rows)
+
+    return quality_check_run_id
+
+
+def run_quality_checks(fail_on_error: bool, persist: bool) -> int:
     engine = get_sqlalchemy_engine()
 
     with engine.connect() as connection:
@@ -117,6 +181,15 @@ def run_quality_checks(fail_on_error: bool) -> int:
     print(f'Quality checks passed: {len(rows) - len(failed_rows)}')
     print(f'Quality checks failed: {len(failed_rows)}')
 
+    if persist and rows:
+        quality_check_run_id = persist_results(rows)
+        print()
+        print(f'Quality check run persisted: {quality_check_run_id}')
+        print(f'Persisted result rows: {len(rows)}')
+    elif not persist:
+        print()
+        print('Quality check results were not persisted.')
+
     if failed_rows and fail_on_error:
         return 1
 
@@ -125,16 +198,25 @@ def run_quality_checks(fail_on_error: bool) -> int:
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description='Run ClinicalPulse completeness, uniqueness, and referential integrity checks.'
+        description='Run and persist ClinicalPulse data quality checks.'
     )
     parser.add_argument(
         '--fail-on-error',
         action='store_true',
         help='Return a non-zero exit code if any quality check fails.',
     )
+    parser.add_argument(
+        '--no-persist',
+        action='store_true',
+        help='Run checks without inserting results into governance.quality_check_result.',
+    )
 
     args = parser.parse_args()
-    return run_quality_checks(fail_on_error=args.fail_on_error)
+
+    return run_quality_checks(
+        fail_on_error=args.fail_on_error,
+        persist=not args.no_persist,
+    )
 
 
 if __name__ == '__main__':

@@ -524,6 +524,90 @@ WHEN NOT MATCHED BY TARGET THEN
 GO
 
 
+IF OBJECT_ID('governance.quality_check_result', 'U') IS NULL
+BEGIN
+    CREATE TABLE governance.quality_check_result (
+        quality_check_result_id BIGINT IDENTITY(1,1) NOT NULL,
+        quality_check_run_id UNIQUEIDENTIFIER NOT NULL,
+
+        quality_rule_id NVARCHAR(80) NOT NULL,
+        rule_name NVARCHAR(200) NOT NULL,
+        quality_dimension NVARCHAR(50) NOT NULL,
+
+        target_schema NVARCHAR(128) NOT NULL,
+        target_table NVARCHAR(128) NOT NULL,
+        target_column NVARCHAR(128) NULL,
+        rule_scope NVARCHAR(50) NOT NULL,
+        severity NVARCHAR(20) NOT NULL,
+
+        total_records BIGINT NOT NULL,
+        failed_records BIGINT NOT NULL,
+        passed_records BIGINT NOT NULL,
+        pass_rate DECIMAL(9, 4) NOT NULL,
+        check_status NVARCHAR(20) NOT NULL,
+
+        checked_datetime DATETIME2(0) NOT NULL,
+        persisted_datetime DATETIME2(0) NOT NULL
+            CONSTRAINT DF_quality_check_result_persisted_datetime
+            DEFAULT SYSUTCDATETIME(),
+
+        run_source NVARCHAR(100) NOT NULL
+            CONSTRAINT DF_quality_check_result_run_source
+            DEFAULT 'src/run_quality_checks.py',
+
+        CONSTRAINT PK_quality_check_result
+            PRIMARY KEY (quality_check_result_id),
+
+        CONSTRAINT FK_quality_check_result_quality_rule
+            FOREIGN KEY (quality_rule_id)
+            REFERENCES governance.quality_rule (quality_rule_id),
+
+        CONSTRAINT CK_quality_check_result_check_status
+            CHECK (check_status IN ('passed', 'failed')),
+
+        CONSTRAINT CK_quality_check_result_counts
+            CHECK (
+                total_records >= 0
+                AND failed_records >= 0
+                AND passed_records >= 0
+                AND failed_records + passed_records = total_records
+            )
+    );
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT 1
+    FROM sys.indexes
+    WHERE name = 'IX_quality_check_result_run_id'
+      AND object_id = OBJECT_ID('governance.quality_check_result')
+)
+BEGIN
+    CREATE INDEX IX_quality_check_result_run_id
+    ON governance.quality_check_result (
+        quality_check_run_id,
+        quality_rule_id
+    );
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT 1
+    FROM sys.indexes
+    WHERE name = 'IX_quality_check_result_persisted_datetime'
+      AND object_id = OBJECT_ID('governance.quality_check_result')
+)
+BEGIN
+    CREATE INDEX IX_quality_check_result_persisted_datetime
+    ON governance.quality_check_result (
+        persisted_datetime DESC,
+        check_status,
+        severity
+    );
+END;
+GO
+
+
 CREATE OR ALTER VIEW governance.vw_quality_check_current AS
 WITH check_result AS (
     SELECT
