@@ -45,7 +45,7 @@ BEGIN
         birthplace          NVARCHAR(255) NULL,
         street_address      NVARCHAR(255) NULL,
         city                NVARCHAR(100) NULL,
-        state_code          NVARCHAR(100) NULL,
+        [state]             NVARCHAR(100) NULL,
         county              NVARCHAR(100) NULL,
         fips                NVARCHAR(50)  NULL,
         zip                 NVARCHAR(20)  NULL,
@@ -145,8 +145,8 @@ GO
 IF OBJECT_ID(N'bronze.conditions', N'U') IS NULL
 BEGIN
     CREATE TABLE bronze.conditions (
-        condition_start_datetime NVARCHAR(50)  NULL,
-        condition_stop_datetime  NVARCHAR(50)  NULL,
+        condition_start_date     NVARCHAR(50)  NULL,
+        condition_stop_date      NVARCHAR(50)  NULL,
         source_patient_id        NVARCHAR(100) NULL,
         source_encounter_id      NVARCHAR(100) NULL,
         condition_system         NVARCHAR(255) NULL,

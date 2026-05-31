@@ -15,7 +15,6 @@ from __future__ import annotations
 
 import argparse
 import hashlib
-import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -66,7 +65,7 @@ TABLE_CONFIGS: dict[str, TableConfig] = {
             'BIRTHPLACE': 'birthplace',
             'ADDRESS': 'street_address',
             'CITY': 'city',
-            'STATE': 'state_code',
+            'STATE': 'state',
             'COUNTY': 'county',
             'FIPS': 'fips',
             'ZIP': 'zip',
@@ -138,8 +137,8 @@ TABLE_CONFIGS: dict[str, TableConfig] = {
         source_file='conditions.csv',
         target_table='conditions',
         column_map={
-            'START': 'condition_start_datetime',
-            'STOP': 'condition_stop_datetime',
+            'START': 'condition_start_date',
+            'STOP': 'condition_stop_date',
             'PATIENT': 'source_patient_id',
             'ENCOUNTER': 'source_encounter_id',
             'SYSTEM': 'condition_system',
