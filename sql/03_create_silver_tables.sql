@@ -131,3 +131,172 @@ CREATE TABLE silver.encounter (
         CHECK (length_of_stay_days IS NULL OR length_of_stay_days >= 0)
 );
 GO
+
+
+DROP TABLE IF EXISTS silver.condition;
+GO
+
+CREATE TABLE silver.condition (
+    condition_record_id BIGINT IDENTITY(1,1) NOT NULL,
+    patient_id NVARCHAR(100) NULL,
+    encounter_id NVARCHAR(100) NULL,
+
+    condition_start_date DATE NULL,
+    condition_stop_date DATE NULL,
+    condition_duration_days INT NULL,
+
+    condition_system NVARCHAR(255) NULL,
+    condition_code NVARCHAR(100) NULL,
+    condition_description NVARCHAR(255) NULL,
+    condition_category NVARCHAR(100) NULL,
+    condition_status NVARCHAR(30) NOT NULL,
+
+    is_missing_start_date BIT NOT NULL,
+    is_invalid_start_date BIT NOT NULL,
+    is_invalid_stop_date BIT NOT NULL,
+    is_stop_before_start BIT NOT NULL,
+    condition_date_quality_status NVARCHAR(50) NOT NULL,
+
+    source_system NVARCHAR(100) NOT NULL,
+    source_entity NVARCHAR(100) NOT NULL,
+    bronze_ingestion_batch_id BIGINT NULL,
+    bronze_ingestion_datetime DATETIME2 NULL,
+    bronze_source_file NVARCHAR(255) NULL,
+    bronze_row_hash VARBINARY(32) NULL,
+    bronze_load_status NVARCHAR(30) NULL,
+
+    silver_load_datetime DATETIME2 NOT NULL
+        CONSTRAINT DF_silver_condition_silver_load_datetime
+        DEFAULT SYSUTCDATETIME(),
+
+    CONSTRAINT PK_silver_condition
+        PRIMARY KEY (condition_record_id),
+
+    CONSTRAINT CK_silver_condition_flags
+        CHECK (
+            is_missing_start_date IN (0, 1)
+            AND is_invalid_start_date IN (0, 1)
+            AND is_invalid_stop_date IN (0, 1)
+            AND is_stop_before_start IN (0, 1)
+        ),
+
+    CONSTRAINT CK_silver_condition_duration_days
+        CHECK (condition_duration_days IS NULL OR condition_duration_days >= 0)
+);
+GO
+
+
+DROP TABLE IF EXISTS silver.[procedure];
+GO
+
+CREATE TABLE silver.[procedure] (
+    procedure_record_id BIGINT IDENTITY(1,1) NOT NULL,
+    patient_id NVARCHAR(100) NULL,
+    encounter_id NVARCHAR(100) NULL,
+
+    procedure_start_datetime_utc DATETIME2(0) NULL,
+    procedure_stop_datetime_utc DATETIME2(0) NULL,
+    procedure_start_date DATE NULL,
+    procedure_stop_date DATE NULL,
+
+    procedure_duration_minutes BIGINT NULL,
+    procedure_duration_hours DECIMAL(18, 2) NULL,
+
+    procedure_system NVARCHAR(255) NULL,
+    procedure_code NVARCHAR(100) NULL,
+    procedure_description NVARCHAR(255) NULL,
+    procedure_category NVARCHAR(100) NULL,
+    base_procedure_cost DECIMAL(18, 2) NULL,
+
+    reason_code NVARCHAR(100) NULL,
+    reason_description NVARCHAR(255) NULL,
+
+    is_missing_start_datetime BIT NOT NULL,
+    is_missing_stop_datetime BIT NOT NULL,
+    is_invalid_start_datetime BIT NOT NULL,
+    is_invalid_stop_datetime BIT NOT NULL,
+    is_stop_before_start BIT NOT NULL,
+    procedure_datetime_quality_status NVARCHAR(50) NOT NULL,
+
+    source_system NVARCHAR(100) NOT NULL,
+    source_entity NVARCHAR(100) NOT NULL,
+    bronze_ingestion_batch_id BIGINT NULL,
+    bronze_ingestion_datetime DATETIME2 NULL,
+    bronze_source_file NVARCHAR(255) NULL,
+    bronze_row_hash VARBINARY(32) NULL,
+    bronze_load_status NVARCHAR(30) NULL,
+
+    silver_load_datetime DATETIME2 NOT NULL
+        CONSTRAINT DF_silver_procedure_silver_load_datetime
+        DEFAULT SYSUTCDATETIME(),
+
+    CONSTRAINT PK_silver_procedure
+        PRIMARY KEY (procedure_record_id),
+
+    CONSTRAINT CK_silver_procedure_flags
+        CHECK (
+            is_missing_start_datetime IN (0, 1)
+            AND is_missing_stop_datetime IN (0, 1)
+            AND is_invalid_start_datetime IN (0, 1)
+            AND is_invalid_stop_datetime IN (0, 1)
+            AND is_stop_before_start IN (0, 1)
+        ),
+
+    CONSTRAINT CK_silver_procedure_duration_minutes
+        CHECK (procedure_duration_minutes IS NULL OR procedure_duration_minutes >= 0),
+
+    CONSTRAINT CK_silver_procedure_duration_hours
+        CHECK (procedure_duration_hours IS NULL OR procedure_duration_hours >= 0)
+);
+GO
+
+
+DROP TABLE IF EXISTS silver.observation;
+GO
+
+CREATE TABLE silver.observation (
+    observation_record_id BIGINT IDENTITY(1,1) NOT NULL,
+    patient_id NVARCHAR(100) NULL,
+    encounter_id NVARCHAR(100) NULL,
+
+    observation_datetime_utc DATETIME2(0) NULL,
+    observation_date DATE NULL,
+
+    observation_category NVARCHAR(100) NULL,
+    observation_code NVARCHAR(100) NULL,
+    observation_description NVARCHAR(255) NULL,
+    observation_value_raw NVARCHAR(255) NULL,
+    observation_value_numeric DECIMAL(18, 6) NULL,
+    observation_units NVARCHAR(100) NULL,
+    observation_type NVARCHAR(100) NULL,
+
+    is_missing_observation_datetime BIT NOT NULL,
+    is_invalid_observation_datetime BIT NOT NULL,
+    is_missing_patient_id BIT NOT NULL,
+    is_missing_observation_code BIT NOT NULL,
+    observation_quality_status NVARCHAR(50) NOT NULL,
+
+    source_system NVARCHAR(100) NOT NULL,
+    source_entity NVARCHAR(100) NOT NULL,
+    bronze_ingestion_batch_id BIGINT NULL,
+    bronze_ingestion_datetime DATETIME2 NULL,
+    bronze_source_file NVARCHAR(255) NULL,
+    bronze_row_hash VARBINARY(32) NULL,
+    bronze_load_status NVARCHAR(30) NULL,
+
+    silver_load_datetime DATETIME2 NOT NULL
+        CONSTRAINT DF_silver_observation_silver_load_datetime
+        DEFAULT SYSUTCDATETIME(),
+
+    CONSTRAINT PK_silver_observation
+        PRIMARY KEY (observation_record_id),
+
+    CONSTRAINT CK_silver_observation_flags
+        CHECK (
+            is_missing_observation_datetime IN (0, 1)
+            AND is_invalid_observation_datetime IN (0, 1)
+            AND is_missing_patient_id IN (0, 1)
+            AND is_missing_observation_code IN (0, 1)
+        )
+);
+GO

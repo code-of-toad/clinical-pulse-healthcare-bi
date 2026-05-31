@@ -351,3 +351,406 @@ SELECT
     @encounter_silver_load_datetime AS silver_load_datetime
 FROM final_encounter;
 GO
+
+
+DECLARE @clinical_context_silver_load_datetime DATETIME2 = SYSUTCDATETIME();
+
+TRUNCATE TABLE silver.condition;
+
+WITH typed_condition AS (
+    SELECT
+        NULLIF(TRIM(source_patient_id), '') AS patient_id,
+        NULLIF(TRIM(source_encounter_id), '') AS encounter_id,
+
+        NULLIF(TRIM(condition_start_date), '') AS raw_start_date,
+        NULLIF(TRIM(condition_stop_date), '') AS raw_stop_date,
+
+        TRY_CONVERT(DATE, NULLIF(TRIM(condition_start_date), ''), 23) AS condition_start_date,
+        TRY_CONVERT(DATE, NULLIF(TRIM(condition_stop_date), ''), 23) AS condition_stop_date,
+
+        NULLIF(TRIM(condition_system), '') AS condition_system,
+        NULLIF(TRIM(condition_code), '') AS condition_code,
+        NULLIF(TRIM(condition_description), '') AS condition_description,
+
+        ingestion_batch_id,
+        ingestion_datetime,
+        source_file,
+        row_hash,
+        load_status
+    FROM bronze.conditions
+),
+final_condition AS (
+    SELECT
+        *,
+        CASE WHEN raw_start_date IS NULL THEN 1 ELSE 0 END AS is_missing_start_date,
+
+        CASE
+            WHEN raw_start_date IS NOT NULL AND condition_start_date IS NULL THEN 1
+            ELSE 0
+        END AS is_invalid_start_date,
+
+        CASE
+            WHEN raw_stop_date IS NOT NULL AND condition_stop_date IS NULL THEN 1
+            ELSE 0
+        END AS is_invalid_stop_date,
+
+        CASE
+            WHEN condition_start_date IS NOT NULL
+             AND condition_stop_date IS NOT NULL
+             AND condition_stop_date < condition_start_date
+            THEN 1
+            ELSE 0
+        END AS is_stop_before_start,
+
+        CASE
+            WHEN raw_start_date IS NULL THEN 'missing_start_date'
+            WHEN condition_start_date IS NULL THEN 'invalid_start_date'
+            WHEN raw_stop_date IS NOT NULL AND condition_stop_date IS NULL THEN 'invalid_stop_date'
+            WHEN condition_stop_date < condition_start_date THEN 'stop_before_start'
+            ELSE 'valid'
+        END AS condition_date_quality_status
+    FROM typed_condition
+)
+INSERT INTO silver.condition (
+    patient_id,
+    encounter_id,
+    condition_start_date,
+    condition_stop_date,
+    condition_duration_days,
+    condition_system,
+    condition_code,
+    condition_description,
+    condition_category,
+    condition_status,
+    is_missing_start_date,
+    is_invalid_start_date,
+    is_invalid_stop_date,
+    is_stop_before_start,
+    condition_date_quality_status,
+    source_system,
+    source_entity,
+    bronze_ingestion_batch_id,
+    bronze_ingestion_datetime,
+    bronze_source_file,
+    bronze_row_hash,
+    bronze_load_status,
+    silver_load_datetime
+)
+SELECT
+    patient_id,
+    encounter_id,
+    condition_start_date,
+    condition_stop_date,
+
+    CASE
+        WHEN condition_date_quality_status = 'valid'
+         AND condition_stop_date IS NOT NULL
+        THEN DATEDIFF(DAY, condition_start_date, condition_stop_date)
+        ELSE NULL
+    END AS condition_duration_days,
+
+    condition_system,
+    condition_code,
+    condition_description,
+
+    CASE
+        WHEN LOWER(condition_description) LIKE '%(finding)%' THEN 'finding'
+        WHEN LOWER(condition_description) LIKE '%(disorder)%' THEN 'disorder'
+        WHEN LOWER(condition_description) LIKE '%(procedure)%' THEN 'procedure'
+        WHEN LOWER(condition_description) LIKE '%(situation)%' THEN 'situation'
+        ELSE 'uncategorized'
+    END AS condition_category,
+
+    CASE
+        WHEN condition_stop_date IS NULL THEN 'active_or_open'
+        ELSE 'resolved_or_closed'
+    END AS condition_status,
+
+    is_missing_start_date,
+    is_invalid_start_date,
+    is_invalid_stop_date,
+    is_stop_before_start,
+    condition_date_quality_status,
+
+    'Synthea CSV' AS source_system,
+    'conditions.csv' AS source_entity,
+    ingestion_batch_id AS bronze_ingestion_batch_id,
+    ingestion_datetime AS bronze_ingestion_datetime,
+    source_file AS bronze_source_file,
+    row_hash AS bronze_row_hash,
+    load_status AS bronze_load_status,
+    @clinical_context_silver_load_datetime AS silver_load_datetime
+FROM final_condition;
+GO
+
+
+DECLARE @procedure_silver_load_datetime DATETIME2 = SYSUTCDATETIME();
+
+TRUNCATE TABLE silver.[procedure];
+
+WITH typed_procedure AS (
+    SELECT
+        NULLIF(TRIM(source_patient_id), '') AS patient_id,
+        NULLIF(TRIM(source_encounter_id), '') AS encounter_id,
+
+        NULLIF(TRIM(procedure_start_datetime), '') AS raw_start_datetime,
+        NULLIF(TRIM(procedure_stop_datetime), '') AS raw_stop_datetime,
+
+        TRY_CONVERT(DATETIMEOFFSET(0), NULLIF(TRIM(procedure_start_datetime), '')) AS start_datetimeoffset,
+        TRY_CONVERT(DATETIMEOFFSET(0), NULLIF(TRIM(procedure_stop_datetime), '')) AS stop_datetimeoffset,
+
+        NULLIF(TRIM(procedure_system), '') AS procedure_system,
+        NULLIF(TRIM(procedure_code), '') AS procedure_code,
+        NULLIF(TRIM(procedure_description), '') AS procedure_description,
+        TRY_CONVERT(DECIMAL(18, 2), NULLIF(TRIM(base_procedure_cost), '')) AS base_procedure_cost,
+
+        NULLIF(TRIM(reason_code), '') AS reason_code,
+        NULLIF(TRIM(reason_description), '') AS reason_description,
+
+        ingestion_batch_id,
+        ingestion_datetime,
+        source_file,
+        row_hash,
+        load_status
+    FROM bronze.procedures
+),
+normalized_procedure AS (
+    SELECT
+        *,
+        CAST(SWITCHOFFSET(start_datetimeoffset, '+00:00') AS DATETIME2(0)) AS procedure_start_datetime_utc,
+        CAST(SWITCHOFFSET(stop_datetimeoffset, '+00:00') AS DATETIME2(0)) AS procedure_stop_datetime_utc
+    FROM typed_procedure
+),
+final_procedure AS (
+    SELECT
+        *,
+        CASE WHEN raw_start_datetime IS NULL THEN 1 ELSE 0 END AS is_missing_start_datetime,
+        CASE WHEN raw_stop_datetime IS NULL THEN 1 ELSE 0 END AS is_missing_stop_datetime,
+
+        CASE
+            WHEN raw_start_datetime IS NOT NULL AND start_datetimeoffset IS NULL THEN 1
+            ELSE 0
+        END AS is_invalid_start_datetime,
+
+        CASE
+            WHEN raw_stop_datetime IS NOT NULL AND stop_datetimeoffset IS NULL THEN 1
+            ELSE 0
+        END AS is_invalid_stop_datetime,
+
+        CASE
+            WHEN procedure_start_datetime_utc IS NOT NULL
+             AND procedure_stop_datetime_utc IS NOT NULL
+             AND procedure_stop_datetime_utc < procedure_start_datetime_utc
+            THEN 1
+            ELSE 0
+        END AS is_stop_before_start,
+
+        CASE
+            WHEN raw_start_datetime IS NULL THEN 'missing_start_datetime'
+            WHEN start_datetimeoffset IS NULL THEN 'invalid_start_datetime'
+            WHEN raw_stop_datetime IS NULL THEN 'missing_stop_datetime'
+            WHEN stop_datetimeoffset IS NULL THEN 'invalid_stop_datetime'
+            WHEN procedure_stop_datetime_utc < procedure_start_datetime_utc THEN 'stop_before_start'
+            ELSE 'valid'
+        END AS procedure_datetime_quality_status
+    FROM normalized_procedure
+)
+INSERT INTO silver.[procedure] (
+    patient_id,
+    encounter_id,
+    procedure_start_datetime_utc,
+    procedure_stop_datetime_utc,
+    procedure_start_date,
+    procedure_stop_date,
+    procedure_duration_minutes,
+    procedure_duration_hours,
+    procedure_system,
+    procedure_code,
+    procedure_description,
+    procedure_category,
+    base_procedure_cost,
+    reason_code,
+    reason_description,
+    is_missing_start_datetime,
+    is_missing_stop_datetime,
+    is_invalid_start_datetime,
+    is_invalid_stop_datetime,
+    is_stop_before_start,
+    procedure_datetime_quality_status,
+    source_system,
+    source_entity,
+    bronze_ingestion_batch_id,
+    bronze_ingestion_datetime,
+    bronze_source_file,
+    bronze_row_hash,
+    bronze_load_status,
+    silver_load_datetime
+)
+SELECT
+    patient_id,
+    encounter_id,
+    procedure_start_datetime_utc,
+    procedure_stop_datetime_utc,
+    CAST(procedure_start_datetime_utc AS DATE) AS procedure_start_date,
+    CAST(procedure_stop_datetime_utc AS DATE) AS procedure_stop_date,
+
+    CASE
+        WHEN procedure_datetime_quality_status = 'valid'
+        THEN DATEDIFF_BIG(MINUTE, procedure_start_datetime_utc, procedure_stop_datetime_utc)
+        ELSE NULL
+    END AS procedure_duration_minutes,
+
+    CASE
+        WHEN procedure_datetime_quality_status = 'valid'
+        THEN CAST(DATEDIFF_BIG(SECOND, procedure_start_datetime_utc, procedure_stop_datetime_utc) / 3600.0 AS DECIMAL(18, 2))
+        ELSE NULL
+    END AS procedure_duration_hours,
+
+    procedure_system,
+    procedure_code,
+    procedure_description,
+
+    CASE
+        WHEN LOWER(procedure_description) LIKE '%dental%' THEN 'dental'
+        WHEN LOWER(procedure_description) LIKE '%therapy%' THEN 'therapy'
+        WHEN LOWER(procedure_description) LIKE '%assessment%' THEN 'assessment'
+        WHEN LOWER(procedure_description) LIKE '%examination%' THEN 'assessment'
+        WHEN LOWER(procedure_description) LIKE '%surgery%' THEN 'surgical'
+        WHEN LOWER(procedure_description) LIKE '%surgical%' THEN 'surgical'
+        ELSE 'other'
+    END AS procedure_category,
+
+    base_procedure_cost,
+    reason_code,
+    reason_description,
+
+    is_missing_start_datetime,
+    is_missing_stop_datetime,
+    is_invalid_start_datetime,
+    is_invalid_stop_datetime,
+    is_stop_before_start,
+    procedure_datetime_quality_status,
+
+    'Synthea CSV' AS source_system,
+    'procedures.csv' AS source_entity,
+    ingestion_batch_id AS bronze_ingestion_batch_id,
+    ingestion_datetime AS bronze_ingestion_datetime,
+    source_file AS bronze_source_file,
+    row_hash AS bronze_row_hash,
+    load_status AS bronze_load_status,
+    @procedure_silver_load_datetime AS silver_load_datetime
+FROM final_procedure;
+GO
+
+
+DECLARE @observation_silver_load_datetime DATETIME2 = SYSUTCDATETIME();
+
+TRUNCATE TABLE silver.observation;
+
+WITH typed_observation AS (
+    SELECT
+        NULLIF(TRIM(source_patient_id), '') AS patient_id,
+        NULLIF(TRIM(source_encounter_id), '') AS encounter_id,
+
+        NULLIF(TRIM(observation_datetime), '') AS raw_observation_datetime,
+        TRY_CONVERT(DATETIMEOFFSET(0), NULLIF(TRIM(observation_datetime), '')) AS observation_datetimeoffset,
+
+        LOWER(NULLIF(TRIM(observation_category), '')) AS raw_observation_category,
+        NULLIF(TRIM(observation_code), '') AS observation_code,
+        NULLIF(TRIM(observation_description), '') AS observation_description,
+        NULLIF(TRIM(observation_value), '') AS observation_value_raw,
+        TRY_CONVERT(DECIMAL(18, 6), NULLIF(TRIM(observation_value), '')) AS observation_value_numeric,
+        NULLIF(TRIM(observation_units), '') AS observation_units,
+        LOWER(NULLIF(TRIM(observation_type), '')) AS observation_type,
+
+        ingestion_batch_id,
+        ingestion_datetime,
+        source_file,
+        row_hash,
+        load_status
+    FROM bronze.observations
+),
+normalized_observation AS (
+    SELECT
+        *,
+        CAST(SWITCHOFFSET(observation_datetimeoffset, '+00:00') AS DATETIME2(0)) AS observation_datetime_utc
+    FROM typed_observation
+),
+final_observation AS (
+    SELECT
+        *,
+        CASE WHEN raw_observation_datetime IS NULL THEN 1 ELSE 0 END AS is_missing_observation_datetime,
+
+        CASE
+            WHEN raw_observation_datetime IS NOT NULL AND observation_datetimeoffset IS NULL THEN 1
+            ELSE 0
+        END AS is_invalid_observation_datetime,
+
+        CASE WHEN patient_id IS NULL THEN 1 ELSE 0 END AS is_missing_patient_id,
+        CASE WHEN observation_code IS NULL THEN 1 ELSE 0 END AS is_missing_observation_code,
+
+        CASE
+            WHEN patient_id IS NULL THEN 'missing_patient_id'
+            WHEN raw_observation_datetime IS NULL THEN 'missing_observation_datetime'
+            WHEN observation_datetimeoffset IS NULL THEN 'invalid_observation_datetime'
+            WHEN observation_code IS NULL THEN 'missing_observation_code'
+            ELSE 'valid'
+        END AS observation_quality_status
+    FROM normalized_observation
+)
+INSERT INTO silver.observation (
+    patient_id,
+    encounter_id,
+    observation_datetime_utc,
+    observation_date,
+    observation_category,
+    observation_code,
+    observation_description,
+    observation_value_raw,
+    observation_value_numeric,
+    observation_units,
+    observation_type,
+    is_missing_observation_datetime,
+    is_invalid_observation_datetime,
+    is_missing_patient_id,
+    is_missing_observation_code,
+    observation_quality_status,
+    source_system,
+    source_entity,
+    bronze_ingestion_batch_id,
+    bronze_ingestion_datetime,
+    bronze_source_file,
+    bronze_row_hash,
+    bronze_load_status,
+    silver_load_datetime
+)
+SELECT
+    patient_id,
+    encounter_id,
+    observation_datetime_utc,
+    CAST(observation_datetime_utc AS DATE) AS observation_date,
+
+    COALESCE(raw_observation_category, 'uncategorized') AS observation_category,
+    observation_code,
+    observation_description,
+    observation_value_raw,
+    observation_value_numeric,
+    observation_units,
+    observation_type,
+
+    is_missing_observation_datetime,
+    is_invalid_observation_datetime,
+    is_missing_patient_id,
+    is_missing_observation_code,
+    observation_quality_status,
+
+    'Synthea CSV' AS source_system,
+    'observations.csv' AS source_entity,
+    ingestion_batch_id AS bronze_ingestion_batch_id,
+    ingestion_datetime AS bronze_ingestion_datetime,
+    source_file AS bronze_source_file,
+    row_hash AS bronze_row_hash,
+    load_status AS bronze_load_status,
+    @observation_silver_load_datetime AS silver_load_datetime
+FROM final_observation;
+GO
