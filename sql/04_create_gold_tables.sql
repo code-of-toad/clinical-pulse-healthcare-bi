@@ -22,6 +22,11 @@ BEGIN
 END;
 GO
 
+DROP TABLE IF EXISTS gold.fact_observation;
+DROP TABLE IF EXISTS gold.fact_procedure;
+DROP TABLE IF EXISTS gold.fact_condition;
+GO
+
 DROP TABLE IF EXISTS gold.fact_readmission;
 DROP TABLE IF EXISTS gold.fact_encounter;
 GO
@@ -253,5 +258,153 @@ CREATE TABLE gold.fact_readmission (
     readmission_logic_status NVARCHAR(100) NOT NULL,
 
     gold_load_datetime DATETIME2 NOT NULL CONSTRAINT df_fact_readmission_gold_load_datetime DEFAULT SYSUTCDATETIME()
+);
+GO
+
+CREATE TABLE gold.fact_condition (
+    condition_fact_key INT IDENTITY(1,1) NOT NULL CONSTRAINT pk_fact_condition PRIMARY KEY,
+
+    condition_record_id BIGINT NOT NULL,
+    patient_key INT NULL,
+    encounter_fact_key INT NULL,
+    condition_key INT NULL,
+    condition_start_date_key INT NULL,
+    condition_stop_date_key INT NULL,
+
+    patient_id NVARCHAR(100) NULL,
+    encounter_id NVARCHAR(100) NULL,
+
+    condition_start_date DATE NULL,
+    condition_stop_date DATE NULL,
+    condition_duration_days INT NULL,
+    condition_system NVARCHAR(255) NULL,
+    condition_code NVARCHAR(100) NULL,
+    condition_description NVARCHAR(255) NULL,
+    condition_category NVARCHAR(100) NULL,
+    condition_status NVARCHAR(30) NOT NULL,
+
+    condition_count INT NOT NULL,
+    active_condition_count INT NOT NULL,
+    resolved_condition_count INT NOT NULL,
+
+    is_missing_start_date BIT NOT NULL,
+    is_invalid_start_date BIT NOT NULL,
+    is_invalid_stop_date BIT NOT NULL,
+    is_stop_before_start BIT NOT NULL,
+    condition_date_quality_status NVARCHAR(50) NOT NULL,
+
+    source_system NVARCHAR(100) NOT NULL,
+    source_entity NVARCHAR(100) NOT NULL,
+    bronze_ingestion_batch_id BIGINT NULL,
+    bronze_source_file NVARCHAR(255) NULL,
+    silver_load_datetime DATETIME2 NOT NULL,
+    gold_load_datetime DATETIME2 NOT NULL CONSTRAINT df_fact_condition_gold_load_datetime DEFAULT SYSUTCDATETIME(),
+
+    CONSTRAINT uq_fact_condition_record_id UNIQUE (condition_record_id)
+);
+GO
+
+CREATE TABLE gold.fact_observation (
+    observation_fact_key INT IDENTITY(1,1) NOT NULL CONSTRAINT pk_fact_observation PRIMARY KEY,
+
+    observation_record_id BIGINT NOT NULL,
+    patient_key INT NULL,
+    encounter_fact_key INT NULL,
+    observation_key INT NULL,
+    observation_date_key INT NULL,
+    organization_key INT NULL,
+    provider_key INT NULL,
+    encounter_class_key INT NULL,
+
+    patient_id NVARCHAR(100) NULL,
+    encounter_id NVARCHAR(100) NULL,
+    organization_id NVARCHAR(100) NULL,
+    provider_id NVARCHAR(100) NULL,
+    encounter_class NVARCHAR(100) NULL,
+
+    observation_datetime_utc DATETIME2 NULL,
+    observation_date DATE NULL,
+    observation_category NVARCHAR(100) NULL,
+    observation_code NVARCHAR(100) NULL,
+    observation_description NVARCHAR(255) NULL,
+    observation_value_raw NVARCHAR(255) NULL,
+    observation_value_numeric DECIMAL(18,6) NULL,
+    observation_units NVARCHAR(100) NULL,
+    observation_type NVARCHAR(100) NULL,
+
+    observation_count INT NOT NULL,
+    numeric_observation_count INT NOT NULL,
+    encounter_linked_observation_count INT NOT NULL,
+    patient_level_observation_count INT NOT NULL,
+
+    is_missing_observation_datetime BIT NOT NULL,
+    is_invalid_observation_datetime BIT NOT NULL,
+    is_missing_patient_id BIT NOT NULL,
+    is_missing_observation_code BIT NOT NULL,
+    observation_quality_status NVARCHAR(50) NOT NULL,
+
+    source_system NVARCHAR(100) NOT NULL,
+    source_entity NVARCHAR(100) NOT NULL,
+    bronze_ingestion_batch_id BIGINT NULL,
+    bronze_source_file NVARCHAR(255) NULL,
+    silver_load_datetime DATETIME2 NOT NULL,
+    gold_load_datetime DATETIME2 NOT NULL CONSTRAINT df_fact_observation_gold_load_datetime DEFAULT SYSUTCDATETIME(),
+
+    CONSTRAINT uq_fact_observation_record_id UNIQUE (observation_record_id)
+);
+GO
+
+CREATE TABLE gold.fact_procedure (
+    procedure_fact_key INT IDENTITY(1,1) NOT NULL CONSTRAINT pk_fact_procedure PRIMARY KEY,
+
+    procedure_record_id BIGINT NOT NULL,
+    patient_key INT NULL,
+    encounter_fact_key INT NULL,
+    procedure_key INT NULL,
+    procedure_start_date_key INT NULL,
+    procedure_stop_date_key INT NULL,
+    organization_key INT NULL,
+    provider_key INT NULL,
+    encounter_class_key INT NULL,
+
+    patient_id NVARCHAR(100) NULL,
+    encounter_id NVARCHAR(100) NULL,
+    organization_id NVARCHAR(100) NULL,
+    provider_id NVARCHAR(100) NULL,
+    encounter_class NVARCHAR(100) NULL,
+
+    procedure_start_datetime_utc DATETIME2 NULL,
+    procedure_stop_datetime_utc DATETIME2 NULL,
+    procedure_start_date DATE NULL,
+    procedure_stop_date DATE NULL,
+    procedure_duration_minutes BIGINT NULL,
+    procedure_duration_hours DECIMAL(18,2) NULL,
+
+    procedure_system NVARCHAR(255) NULL,
+    procedure_code NVARCHAR(100) NULL,
+    procedure_description NVARCHAR(255) NULL,
+    procedure_category NVARCHAR(100) NULL,
+    base_procedure_cost DECIMAL(18,2) NULL,
+    reason_code NVARCHAR(100) NULL,
+    reason_description NVARCHAR(255) NULL,
+
+    procedure_count INT NOT NULL,
+    valid_procedure_count INT NOT NULL,
+
+    is_missing_start_datetime BIT NOT NULL,
+    is_missing_stop_datetime BIT NOT NULL,
+    is_invalid_start_datetime BIT NOT NULL,
+    is_invalid_stop_datetime BIT NOT NULL,
+    is_stop_before_start BIT NOT NULL,
+    procedure_datetime_quality_status NVARCHAR(50) NOT NULL,
+
+    source_system NVARCHAR(100) NOT NULL,
+    source_entity NVARCHAR(100) NOT NULL,
+    bronze_ingestion_batch_id BIGINT NULL,
+    bronze_source_file NVARCHAR(255) NULL,
+    silver_load_datetime DATETIME2 NOT NULL,
+    gold_load_datetime DATETIME2 NOT NULL CONSTRAINT df_fact_procedure_gold_load_datetime DEFAULT SYSUTCDATETIME(),
+
+    CONSTRAINT uq_fact_procedure_record_id UNIQUE (procedure_record_id)
 );
 GO
