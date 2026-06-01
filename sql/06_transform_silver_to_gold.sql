@@ -1622,3 +1622,113 @@ GROUP BY
     fp.procedure_datetime_quality_status;
 GO
 
+
+
+/*
+Purpose: Create a reporting-ready mart for data quality pass/fail status,
+issue counts, governance ownership, and reporting readiness.
+
+Assumptions:
+- mart_reporting_trust is sourced from gold.fact_data_quality_issue.
+- The mart includes both latest-run and historical-run rows, with is_latest_run available for dashboard filtering.
+- Reporting readiness is derived from failed-check severity:
+  critical/high failures require remediation, medium/low failures require review, and fully passing groups are ready.
+*/
+
+GO
+
+CREATE OR ALTER VIEW gold.mart_reporting_trust AS
+SELECT
+    f.quality_check_run_id,
+    f.is_latest_run,
+
+    f.target_schema,
+    f.target_table,
+    f.target_column,
+    f.target_object_name,
+
+    f.quality_dimension,
+    f.severity,
+    f.rule_scope,
+
+    f.owner_role,
+    f.steward_role,
+
+    MIN(f.checked_datetime) AS first_checked_datetime,
+    MAX(f.checked_datetime) AS latest_checked_datetime,
+    MAX(f.persisted_datetime) AS latest_persisted_datetime,
+    MAX(f.gold_load_datetime) AS latest_gold_load_datetime,
+
+    SUM(f.quality_check_count) AS quality_check_count,
+    SUM(f.passed_check_count) AS passed_check_count,
+    SUM(f.failed_check_count) AS failed_check_count,
+
+    SUM(f.total_records) AS total_records_evaluated,
+    SUM(f.passed_records) AS passed_records,
+    SUM(f.failed_records) AS failed_records,
+    SUM(f.issue_count) AS issue_count,
+
+    SUM(CASE WHEN f.has_quality_issue = 1 THEN 1 ELSE 0 END) AS quality_issue_rule_count,
+
+    SUM(f.critical_issue_count) AS critical_issue_count,
+    SUM(f.high_issue_count) AS high_issue_count,
+    SUM(f.medium_issue_count) AS medium_issue_count,
+    SUM(f.low_issue_count) AS low_issue_count,
+
+    CAST(
+        SUM(f.passed_check_count) * 1.0 / NULLIF(SUM(f.quality_check_count), 0)
+        AS DECIMAL(9,4)
+    ) AS check_pass_rate,
+
+    CAST(
+        SUM(f.passed_records) * 1.0 / NULLIF(SUM(f.total_records), 0)
+        AS DECIMAL(9,4)
+    ) AS record_pass_rate,
+
+    CAST(
+        100.0 * SUM(f.passed_check_count) / NULLIF(SUM(f.quality_check_count), 0)
+        AS DECIMAL(9,2)
+    ) AS reporting_trust_score,
+
+    CASE
+        WHEN SUM(f.failed_check_count) = 0 THEN 'ready_for_reporting'
+        WHEN SUM(f.critical_issue_count) > 0 THEN 'critical_remediation_required'
+        WHEN SUM(f.high_issue_count) > 0 THEN 'high_priority_remediation_required'
+        WHEN SUM(f.medium_issue_count) > 0 THEN 'review_required'
+        WHEN SUM(f.low_issue_count) > 0 THEN 'minor_review_required'
+        ELSE 'review_required'
+    END AS reporting_readiness_status,
+
+    CASE
+        WHEN SUM(f.failed_check_count) = 0 THEN 1
+        ELSE 0
+    END AS is_reporting_ready,
+
+    CASE
+        WHEN SUM(f.failed_check_count) > 0 THEN 1
+        ELSE 0
+    END AS has_failed_checks,
+
+    CASE
+        WHEN SUM(f.issue_count) > 0 THEN 1
+        ELSE 0
+    END AS has_record_level_issues,
+
+    COUNT(DISTINCT f.quality_rule_id) AS distinct_quality_rule_count
+FROM gold.fact_data_quality_issue f
+GROUP BY
+    f.quality_check_run_id,
+    f.is_latest_run,
+    f.target_schema,
+    f.target_table,
+    f.target_column,
+    f.target_object_name,
+    f.quality_dimension,
+    f.severity,
+    f.rule_scope,
+    f.owner_role,
+    f.steward_role;
+GO
+
+
+
