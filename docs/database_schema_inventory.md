@@ -1,6 +1,6 @@
 # Database Schema Inventory
 
-This document records the current SQL Server table structures and representative sample values for the ClinicalPulse bronze and audit schemas. It is intended to support reliable bronze-to-silver transformation work, data quality rule design, lineage documentation, and future assistant/project-source context.
+This document records the current SQL Server table structures and representative sample values for the ClinicalPulse bronze, silver, audit, and governance schemas. It is intended to support reliable transformation work, data quality rule design, lineage documentation, and future assistant/project-source context.
 
 ClinicalPulse uses synthetic Synthea data. The sample values below are not real patient data and should not be described as clinical evidence or production hospital records.
 
@@ -14,19 +14,27 @@ Those fields are documented in the schema inventory because they exist in bronze
 
 The current database inventory covers:
 
-| Schema | Table |
-|---|---|
-| `audit` | `ingestion_batch` |
-| `audit` | `ingestion_file_log` |
-| `bronze` | `patients` |
-| `bronze` | `encounters` |
-| `bronze` | `conditions` |
-| `bronze` | `observations` |
-| `bronze` | `procedures` |
-| `bronze` | `organizations` |
-| `bronze` | `providers` |
+| Schema | Object | Type |
+|---|---|---|
+| `audit` | `ingestion_batch` | Table |
+| `audit` | `ingestion_file_log` | Table |
+| `bronze` | `patients` | Table |
+| `bronze` | `encounters` | Table |
+| `bronze` | `conditions` | Table |
+| `bronze` | `observations` | Table |
+| `bronze` | `procedures` | Table |
+| `bronze` | `organizations` | Table |
+| `bronze` | `providers` | Table |
+| `silver` | `patient` | Table |
+| `silver` | `encounter` | Table |
+| `silver` | `condition` | Table |
+| `silver` | `procedure` | Table |
+| `silver` | `observation` | Table |
+| `governance` | `quality_rule` | Table |
+| `governance` | `quality_check_result` | Table |
+| `governance` | `vw_quality_check_current` | View |
 
-The current bronze model is source-preserving. Most source business fields are stored as `nvarchar` in bronze and should be typed, standardized, and validated in silver.
+The current bronze model is source-preserving. Most source business fields are stored as `nvarchar` in bronze and are typed, standardized, and validated in silver. The governance layer stores quality rule metadata and persisted quality-check results.
 
 ## Audit Load Snapshot
 
@@ -446,3 +454,358 @@ The bronze column is spelled `speciality`; standardize to `specialty` in silver 
 - Do not treat synthetic data as real patient data.
 - Keep bronze as source-preserving as practical; perform business-friendly naming and typing in silver.
 - Keep lineage columns through silver so gold, KPI validation, Power BI, and FHIR-style outputs can be traced back to source files and ingestion batches.
+
+---
+
+## Sprint 4 Update: Silver and Governance Inventory
+
+This section records the database state after Sprint 4 silver-layer and validation work. Silver tables now contain standardized, typed, lineage-preserving entities for patient, encounter, condition, procedure, and observation. Governance objects now define quality-rule metadata, expose current quality-check results, and persist quality-check run history.
+
+### Current Row Counts
+
+| Object | Row Count |
+|---|---:|
+| `silver.patient` | 1,145 |
+| `silver.encounter` | 71,663 |
+| `silver.condition` | 43,758 |
+| `silver.procedure` | 196,207 |
+| `silver.observation` | 945,531 |
+| `governance.quality_rule` | 21 |
+| `governance.quality_check_result` | 20 |
+| `governance.vw_quality_check_current` | 20 |
+
+### Silver Layer Design Notes
+
+- Silver tables use business-friendly singular table names: `silver.patient`, `silver.encounter`, `silver.condition`, `silver.procedure`, and `silver.observation`.
+- Silver fields convert bronze `nvarchar` values into typed SQL Server values where appropriate, including `date`, `datetime2`, `decimal`, `int`, `bigint`, and `bit`.
+- Silver entities retain bronze lineage fields: `bronze_ingestion_batch_id`, `bronze_ingestion_datetime`, `bronze_source_file`, `bronze_row_hash`, and `bronze_load_status`.
+- `bronze_row_hash` remains `varbinary(32)` in silver, matching the bronze source lineage hash.
+- Quality status columns are included in silver tables to make validity and completeness issues visible without destroying source traceability.
+
+## Silver Column Inventory
+
+### `silver.patient`
+
+| Ordinal | Column | Data Type | Nullable | Notes |
+|---:|---|---|---|---|
+| 1 | `patient_id` | `nvarchar(100)` | NO | Standardized from `bronze.patients.source_patient_id`. |
+| 2 | `birth_date` | `date` | YES | Typed from bronze `birthdate`. |
+| 3 | `death_date` | `date` | YES | Typed from bronze `deathdate`. |
+| 4 | `is_deceased` | `bit` | NO | Derived from `death_date`. |
+| 5 | `age_reference_date` | `date` | NO | Death date for deceased patients; silver load date otherwise. |
+| 6 | `age_reference_type` | `nvarchar(30)` | NO | Indicates whether age uses `death_date` or `silver_load_date`. |
+| 7 | `age_years` | `int` | YES | Derived age calculation. |
+| 8 | `age_band` | `nvarchar(20)` | YES | Derived reporting band. |
+| 9 | `gender` | `nvarchar(50)` | YES | Standardized demographic field. |
+| 10 | `race` | `nvarchar(100)` | YES | Standardized demographic field. |
+| 11 | `ethnicity` | `nvarchar(100)` | YES | Standardized demographic field. |
+| 12 | `marital_status` | `nvarchar(50)` | YES | Standardized from bronze `marital`. |
+| 13 | `city` | `nvarchar(100)` | YES | Geographic field. |
+| 14 | `state` | `nvarchar(100)` | YES | Geographic field. |
+| 15 | `county` | `nvarchar(100)` | YES | Geographic field. |
+| 16 | `fips` | `nvarchar(50)` | YES | Geographic code. |
+| 17 | `zip` | `nvarchar(20)` | YES | Postal code. |
+| 18 | `latitude` | `decimal(18,12)` | YES | Typed from bronze `lat`. |
+| 19 | `longitude` | `decimal(18,12)` | YES | Typed from bronze `lon`. |
+| 20 | `healthcare_expenses` | `decimal(18,2)` | YES | Typed financial field. |
+| 21 | `healthcare_coverage` | `decimal(18,2)` | YES | Typed financial field. |
+| 22 | `income` | `int` | YES | Typed income field. |
+| 23 | `patient_date_quality_status` | `nvarchar(50)` | NO | Date-quality status, e.g. `valid`. |
+| 24 | `source_system` | `nvarchar(100)` | NO | Source system label. |
+| 25 | `source_entity` | `nvarchar(100)` | NO | Source entity/file label. |
+| 26 | `bronze_ingestion_batch_id` | `bigint` | YES | Lineage to bronze ingestion batch. |
+| 27 | `bronze_ingestion_datetime` | `datetime2` | YES | Lineage to bronze ingestion timestamp. |
+| 28 | `bronze_source_file` | `nvarchar(255)` | YES | Lineage to source CSV file. |
+| 29 | `bronze_row_hash` | `varbinary(32)` | YES | Lineage hash copied from bronze. |
+| 30 | `bronze_load_status` | `nvarchar(30)` | YES | Bronze load status. |
+| 31 | `silver_load_datetime` | `datetime2` | NO | Silver transform timestamp. |
+
+### `silver.encounter`
+
+| Ordinal | Column | Data Type | Nullable | Notes |
+|---:|---|---|---|---|
+| 1 | `encounter_id` | `nvarchar(100)` | NO | Standardized from `bronze.encounters.source_encounter_id`. |
+| 2 | `patient_id` | `nvarchar(100)` | YES | Patient reference. |
+| 3 | `organization_id` | `nvarchar(100)` | YES | Organization reference. |
+| 4 | `provider_id` | `nvarchar(100)` | YES | Provider reference. |
+| 5 | `payer_id` | `nvarchar(100)` | YES | Payer reference retained from source. |
+| 6 | `encounter_start_datetime_utc` | `datetime2` | YES | Parsed UTC encounter start. |
+| 7 | `encounter_stop_datetime_utc` | `datetime2` | YES | Parsed UTC encounter stop. |
+| 8 | `encounter_start_date` | `date` | YES | Derived from start timestamp. |
+| 9 | `encounter_stop_date` | `date` | YES | Derived from stop timestamp. |
+| 10 | `encounter_duration_minutes` | `bigint` | YES | Derived duration in minutes. |
+| 11 | `encounter_duration_hours` | `decimal(18,2)` | YES | Derived duration in hours. |
+| 12 | `length_of_stay_days` | `decimal(18,4)` | YES | Derived length of stay in days. |
+| 13 | `encounter_class` | `nvarchar(100)` | YES | Standardized to lower-case grouping value. |
+| 14 | `encounter_code` | `nvarchar(100)` | YES | Encounter code. |
+| 15 | `encounter_description` | `nvarchar(255)` | YES | Encounter description. |
+| 16 | `base_encounter_cost` | `decimal(18,2)` | YES | Typed cost field. |
+| 17 | `total_claim_cost` | `decimal(18,2)` | YES | Typed cost field. |
+| 18 | `payer_coverage` | `decimal(18,2)` | YES | Typed coverage field. |
+| 19 | `reason_code` | `nvarchar(100)` | YES | Reason code. |
+| 20 | `reason_description` | `nvarchar(255)` | YES | Reason description. |
+| 21 | `is_missing_start_datetime` | `bit` | NO | Quality flag. |
+| 22 | `is_missing_stop_datetime` | `bit` | NO | Quality flag. |
+| 23 | `is_invalid_start_datetime` | `bit` | NO | Quality flag. |
+| 24 | `is_invalid_stop_datetime` | `bit` | NO | Quality flag. |
+| 25 | `is_stop_before_start` | `bit` | NO | Quality flag. |
+| 26 | `encounter_datetime_quality_status` | `nvarchar(50)` | NO | Date-quality status. |
+| 27 | `source_system` | `nvarchar(100)` | NO | Source system label. |
+| 28 | `source_entity` | `nvarchar(100)` | NO | Source entity/file label. |
+| 29 | `bronze_ingestion_batch_id` | `bigint` | YES | Lineage to bronze ingestion batch. |
+| 30 | `bronze_ingestion_datetime` | `datetime2` | YES | Lineage to bronze ingestion timestamp. |
+| 31 | `bronze_source_file` | `nvarchar(255)` | YES | Lineage to source CSV file. |
+| 32 | `bronze_row_hash` | `varbinary(32)` | YES | Lineage hash copied from bronze. |
+| 33 | `bronze_load_status` | `nvarchar(30)` | YES | Bronze load status. |
+| 34 | `silver_load_datetime` | `datetime2` | NO | Silver transform timestamp. |
+
+### `silver.condition`
+
+| Ordinal | Column | Data Type | Nullable | Notes |
+|---:|---|---|---|---|
+| 1 | `condition_record_id` | `bigint` | NO | Surrogate silver record key. |
+| 2 | `patient_id` | `nvarchar(100)` | YES | Patient reference. |
+| 3 | `encounter_id` | `nvarchar(100)` | YES | Encounter reference. |
+| 4 | `condition_start_date` | `date` | YES | Typed condition start date. |
+| 5 | `condition_stop_date` | `date` | YES | Typed condition stop date. |
+| 6 | `condition_duration_days` | `int` | YES | Derived duration for closed conditions. |
+| 7 | `condition_system` | `nvarchar(255)` | YES | Coding system, e.g. SNOMED-CT. |
+| 8 | `condition_code` | `nvarchar(100)` | YES | Condition code. |
+| 9 | `condition_description` | `nvarchar(255)` | YES | Condition description. |
+| 10 | `condition_category` | `nvarchar(100)` | YES | Derived category from description. |
+| 11 | `condition_status` | `nvarchar(30)` | NO | `active_or_open` or `resolved_or_closed`. |
+| 12 | `is_missing_start_date` | `bit` | NO | Quality flag. |
+| 13 | `is_invalid_start_date` | `bit` | NO | Quality flag. |
+| 14 | `is_invalid_stop_date` | `bit` | NO | Quality flag. |
+| 15 | `is_stop_before_start` | `bit` | NO | Quality flag. |
+| 16 | `condition_date_quality_status` | `nvarchar(50)` | NO | Date-quality status. |
+| 17 | `source_system` | `nvarchar(100)` | NO | Source system label. |
+| 18 | `source_entity` | `nvarchar(100)` | NO | Source entity/file label. |
+| 19 | `bronze_ingestion_batch_id` | `bigint` | YES | Lineage to bronze ingestion batch. |
+| 20 | `bronze_ingestion_datetime` | `datetime2` | YES | Lineage to bronze ingestion timestamp. |
+| 21 | `bronze_source_file` | `nvarchar(255)` | YES | Lineage to source CSV file. |
+| 22 | `bronze_row_hash` | `varbinary(32)` | YES | Lineage hash copied from bronze. |
+| 23 | `bronze_load_status` | `nvarchar(30)` | YES | Bronze load status. |
+| 24 | `silver_load_datetime` | `datetime2` | NO | Silver transform timestamp. |
+
+### `silver.procedure`
+
+| Ordinal | Column | Data Type | Nullable | Notes |
+|---:|---|---|---|---|
+| 1 | `procedure_record_id` | `bigint` | NO | Surrogate silver record key. |
+| 2 | `patient_id` | `nvarchar(100)` | YES | Patient reference. |
+| 3 | `encounter_id` | `nvarchar(100)` | YES | Encounter reference. |
+| 4 | `procedure_start_datetime_utc` | `datetime2` | YES | Parsed UTC procedure start. |
+| 5 | `procedure_stop_datetime_utc` | `datetime2` | YES | Parsed UTC procedure stop. |
+| 6 | `procedure_start_date` | `date` | YES | Derived start date. |
+| 7 | `procedure_stop_date` | `date` | YES | Derived stop date. |
+| 8 | `procedure_duration_minutes` | `bigint` | YES | Derived duration in minutes. |
+| 9 | `procedure_duration_hours` | `decimal(18,2)` | YES | Derived duration in hours. |
+| 10 | `procedure_system` | `nvarchar(255)` | YES | Coding system, e.g. SNOMED-CT. |
+| 11 | `procedure_code` | `nvarchar(100)` | YES | Procedure code. |
+| 12 | `procedure_description` | `nvarchar(255)` | YES | Procedure description. |
+| 13 | `procedure_category` | `nvarchar(100)` | YES | Derived broad category. |
+| 14 | `base_procedure_cost` | `decimal(18,2)` | YES | Typed cost field. |
+| 15 | `reason_code` | `nvarchar(100)` | YES | Reason code. |
+| 16 | `reason_description` | `nvarchar(255)` | YES | Reason description. |
+| 17 | `is_missing_start_datetime` | `bit` | NO | Quality flag. |
+| 18 | `is_missing_stop_datetime` | `bit` | NO | Quality flag. |
+| 19 | `is_invalid_start_datetime` | `bit` | NO | Quality flag. |
+| 20 | `is_invalid_stop_datetime` | `bit` | NO | Quality flag. |
+| 21 | `is_stop_before_start` | `bit` | NO | Quality flag. |
+| 22 | `procedure_datetime_quality_status` | `nvarchar(50)` | NO | Datetime-quality status. |
+| 23 | `source_system` | `nvarchar(100)` | NO | Source system label. |
+| 24 | `source_entity` | `nvarchar(100)` | NO | Source entity/file label. |
+| 25 | `bronze_ingestion_batch_id` | `bigint` | YES | Lineage to bronze ingestion batch. |
+| 26 | `bronze_ingestion_datetime` | `datetime2` | YES | Lineage to bronze ingestion timestamp. |
+| 27 | `bronze_source_file` | `nvarchar(255)` | YES | Lineage to source CSV file. |
+| 28 | `bronze_row_hash` | `varbinary(32)` | YES | Lineage hash copied from bronze. |
+| 29 | `bronze_load_status` | `nvarchar(30)` | YES | Bronze load status. |
+| 30 | `silver_load_datetime` | `datetime2` | NO | Silver transform timestamp. |
+
+### `silver.observation`
+
+| Ordinal | Column | Data Type | Nullable | Notes |
+|---:|---|---|---|---|
+| 1 | `observation_record_id` | `bigint` | NO | Surrogate silver record key. |
+| 2 | `patient_id` | `nvarchar(100)` | YES | Patient reference. |
+| 3 | `encounter_id` | `nvarchar(100)` | YES | Encounter reference; may be NULL for patient-level observations. |
+| 4 | `observation_datetime_utc` | `datetime2` | YES | Parsed UTC observation timestamp. |
+| 5 | `observation_date` | `date` | YES | Derived observation date. |
+| 6 | `observation_category` | `nvarchar(100)` | YES | Standardized category; null source categories become `uncategorized`. |
+| 7 | `observation_code` | `nvarchar(100)` | YES | Observation code. |
+| 8 | `observation_description` | `nvarchar(255)` | YES | Observation description. |
+| 9 | `observation_value_raw` | `nvarchar(255)` | YES | Raw observation value. |
+| 10 | `observation_value_numeric` | `decimal(18,6)` | YES | Numeric parse where possible. |
+| 11 | `observation_units` | `nvarchar(100)` | YES | Unit string. |
+| 12 | `observation_type` | `nvarchar(100)` | YES | Source value type. |
+| 13 | `is_missing_observation_datetime` | `bit` | NO | Quality flag. |
+| 14 | `is_invalid_observation_datetime` | `bit` | NO | Quality flag. |
+| 15 | `is_missing_patient_id` | `bit` | NO | Quality flag. |
+| 16 | `is_missing_observation_code` | `bit` | NO | Quality flag. |
+| 17 | `observation_quality_status` | `nvarchar(50)` | NO | Observation quality status. |
+| 18 | `source_system` | `nvarchar(100)` | NO | Source system label. |
+| 19 | `source_entity` | `nvarchar(100)` | NO | Source entity/file label. |
+| 20 | `bronze_ingestion_batch_id` | `bigint` | YES | Lineage to bronze ingestion batch. |
+| 21 | `bronze_ingestion_datetime` | `datetime2` | YES | Lineage to bronze ingestion timestamp. |
+| 22 | `bronze_source_file` | `nvarchar(255)` | YES | Lineage to source CSV file. |
+| 23 | `bronze_row_hash` | `varbinary(32)` | YES | Lineage hash copied from bronze. |
+| 24 | `bronze_load_status` | `nvarchar(30)` | YES | Bronze load status. |
+| 25 | `silver_load_datetime` | `datetime2` | NO | Silver transform timestamp. |
+
+## Governance Column Inventory
+
+### `governance.quality_rule`
+
+| Ordinal | Column | Data Type | Nullable | Notes |
+|---:|---|---|---|---|
+| 1 | `quality_rule_id` | `nvarchar(80)` | NO | Stable rule identifier. |
+| 2 | `rule_name` | `nvarchar(200)` | NO | Human-readable rule name. |
+| 3 | `quality_dimension` | `nvarchar(50)` | NO | Completeness, uniqueness, referential integrity, validity, consistency, freshness, or lineage. |
+| 4 | `target_schema` | `nvarchar(128)` | NO | Target schema. |
+| 5 | `target_table` | `nvarchar(128)` | NO | Target table or logical table group. |
+| 6 | `target_column` | `nvarchar(128)` | YES | Target column when applicable. |
+| 7 | `rule_scope` | `nvarchar(50)` | NO | Row, table, cross-table, or pipeline scope. |
+| 8 | `severity` | `nvarchar(20)` | NO | Critical, high, medium, or low. |
+| 9 | `owner_role` | `nvarchar(100)` | NO | Rule owner role. |
+| 10 | `steward_role` | `nvarchar(100)` | NO | Steward role. |
+| 11 | `business_description` | `nvarchar(1000)` | NO | Business explanation. |
+| 12 | `technical_description` | `nvarchar(2000)` | NO | Technical check explanation. |
+| 13 | `expected_outcome` | `nvarchar(1000)` | NO | Expected result. |
+| 14 | `is_active` | `bit` | NO | Active-rule flag. |
+| 15 | `created_datetime` | `datetime2` | NO | Creation timestamp. |
+| 16 | `updated_datetime` | `datetime2` | NO | Last update timestamp. |
+
+### `governance.quality_check_result`
+
+| Ordinal | Column | Data Type | Nullable | Notes |
+|---:|---|---|---|---|
+| 1 | `quality_check_result_id` | `bigint` | NO | Result row surrogate key. |
+| 2 | `quality_check_run_id` | `uniqueidentifier` | NO | Run-level identifier grouping one execution. |
+| 3 | `quality_rule_id` | `nvarchar(80)` | NO | Foreign key to `governance.quality_rule`. |
+| 4 | `rule_name` | `nvarchar(200)` | NO | Rule name captured at execution time. |
+| 5 | `quality_dimension` | `nvarchar(50)` | NO | Quality dimension. |
+| 6 | `target_schema` | `nvarchar(128)` | NO | Target schema. |
+| 7 | `target_table` | `nvarchar(128)` | NO | Target table or logical group. |
+| 8 | `target_column` | `nvarchar(128)` | YES | Target column when applicable. |
+| 9 | `rule_scope` | `nvarchar(50)` | NO | Rule scope. |
+| 10 | `severity` | `nvarchar(20)` | NO | Rule severity. |
+| 11 | `total_records` | `bigint` | NO | Records evaluated. |
+| 12 | `failed_records` | `bigint` | NO | Records or checks failing the rule. |
+| 13 | `passed_records` | `bigint` | NO | Records passing the rule. |
+| 14 | `pass_rate` | `decimal(9,4)` | NO | Pass-rate ratio. |
+| 15 | `check_status` | `nvarchar(20)` | NO | `passed` or `failed`. |
+| 16 | `checked_datetime` | `datetime2` | NO | Time the view result was produced. |
+| 17 | `persisted_datetime` | `datetime2` | NO | Time the result was inserted. |
+| 18 | `run_source` | `nvarchar(100)` | NO | Script/source that persisted the run. |
+
+### `governance.vw_quality_check_current`
+
+The current-state quality-check view exposes 20 executable quality checks. It includes rule metadata, target scope, evaluated record counts, failure counts, pass rates, check status, and checked timestamp. It is read by `src/run_quality_checks.py`, and persisted runs are inserted into `governance.quality_check_result`.
+
+## Representative Silver Sample Values
+
+### `silver.patient` sample
+
+| patient_id | birth_date | death_date | is_deceased | age_reference_date | age_reference_type | age_years | age_band | gender | race | ethnicity | marital_status | city | state | county | healthcare_expenses | healthcare_coverage | income | patient_date_quality_status | source_entity | bronze_ingestion_batch_id | bronze_source_file | bronze_load_status |
+|---|---|---|---:|---|---|---:|---|---|---|---|---|---|---|---|---:|---:|---:|---|---|---:|---|---|
+| 00710f47-36de-4d24-1e15-d9b77f5096b8 | 1966-04-11 | NULL | 0 | 2026-05-31 | silver_load_date | 60 | 50-64 | M | black | nonhispanic | M | Boston | Massachusetts | Suffolk County | 225058.27 | 185971.24 | 27898 | valid | patients.csv | 2 | patients.csv | loaded |
+| 00b64473-9de5-cfac-1ece-16fffba92ac8 | 2014-12-08 | NULL | 0 | 2026-05-31 | silver_load_date | 11 | 0-17 | F | hawaiian | nonhispanic | NULL | Boston | Massachusetts | Suffolk County | 28618.96 | 2578.45 | 83517 | valid | patients.csv | 2 | patients.csv | loaded |
+| 0103d5dd-3dd6-e4ee-f79d-e84db4035eaf | 1962-03-20 | NULL | 0 | 2026-05-31 | silver_load_date | 64 | 50-64 | M | asian | nonhispanic | M | Somerville | Massachusetts | Middlesex County | 115216.58 | 1042761.41 | 6362 | valid | patients.csv | 2 | patients.csv | loaded |
+
+### `silver.encounter` sample
+
+| encounter_id | patient_id | encounter_start_datetime_utc | encounter_stop_datetime_utc | encounter_duration_minutes | encounter_duration_hours | length_of_stay_days | encounter_class | encounter_code | encounter_description | encounter_datetime_quality_status | source_entity | bronze_ingestion_batch_id |
+|---|---|---|---|---:|---:|---:|---|---|---|---|---|---:|
+| 00710f47-36de-4d24-015a-79647aba53a3 | 00710f47-36de-4d24-1e15-d9b77f5096b8 | 2017-03-20 20:28:05 | 2017-03-21 00:12:30 | 224 | 3.74 | 0.1558 | ambulatory | 185349003 | Encounter for check up (procedure) | valid | encounters.csv | 2 |
+| 00710f47-36de-4d24-14f6-9e776bd43aad | 00710f47-36de-4d24-1e15-d9b77f5096b8 | 2020-04-27 05:28:05 | 2020-04-27 05:43:05 | 15 | 0.25 | 0.0104 | ambulatory | 185345009 | Encounter for symptom (procedure) | valid | encounters.csv | 2 |
+| 00710f47-36de-4d24-1b3d-9488710345f5 | 00710f47-36de-4d24-1e15-d9b77f5096b8 | 2020-05-04 05:28:05 | 2020-05-04 05:43:05 | 15 | 0.25 | 0.0104 | ambulatory | 185345009 | Encounter for symptom (procedure) | valid | encounters.csv | 2 |
+
+### `silver.condition` sample
+
+| condition_record_id | patient_id | encounter_id | condition_start_date | condition_stop_date | condition_duration_days | condition_system | condition_code | condition_description | condition_category | condition_status | condition_date_quality_status | source_entity | bronze_ingestion_batch_id |
+|---:|---|---|---|---|---:|---|---|---|---|---|---|---|---:|
+| 1 | e70dd4d4-66e5-7a84-d346-25f6b1e4de2f | e70dd4d4-66e5-7a84-ff33-c63646037ed5 | 2026-05-18 | NULL | NULL | SNOMED-CT | 314529007 | Medication review due (situation) | situation | active_or_open | valid | conditions.csv | 2 |
+| 2 | eb227384-1ba4-0aa4-9d0e-0cc4682d5133 | eb227384-1ba4-0aa4-25a3-942466621b92 | 2016-05-04 | 2018-05-16 | 742 | SNOMED-CT | 314529007 | Medication review due (situation) | situation | resolved_or_closed | valid | conditions.csv | 2 |
+| 3 | a94d9782-208d-2a0a-50f8-8a89fc65ef36 | a94d9782-208d-2a0a-61de-9c65601b45e8 | 2024-02-14 | 2024-03-20 | 35 | SNOMED-CT | 314529007 | Medication review due (situation) | situation | resolved_or_closed | valid | conditions.csv | 2 |
+
+### `silver.procedure` sample
+
+| procedure_record_id | patient_id | encounter_id | procedure_start_datetime_utc | procedure_stop_datetime_utc | procedure_duration_minutes | procedure_duration_hours | procedure_system | procedure_code | procedure_description | procedure_category | base_procedure_cost | procedure_datetime_quality_status | source_entity | bronze_ingestion_batch_id |
+|---:|---|---|---|---|---:|---:|---|---|---|---|---:|---|---|---:|
+| 1 | a94d9782-208d-2a0a-50f8-8a89fc65ef36 | a94d9782-208d-2a0a-07ff-32d3007915e6 | 2024-03-20 09:52:13 | 2024-03-20 10:07:13 | 15 | 0.25 | SNOMED-CT | 430193006 | Medication reconciliation (procedure) | other | 515.68 | valid | procedures.csv | 2 |
+| 2 | eb227384-1ba4-0aa4-9d0e-0cc4682d5133 | eb227384-1ba4-0aa4-c0d5-c4661918204b | 2018-05-16 06:19:09 | 2018-05-16 06:34:09 | 15 | 0.25 | SNOMED-CT | 430193006 | Medication reconciliation (procedure) | other | 215.70 | valid | procedures.csv | 2 |
+| 3 | a94d9782-208d-2a0a-50f8-8a89fc65ef36 | a94d9782-208d-2a0a-9adf-b5cdf9fe93d6 | 2024-05-22 09:52:13 | 2024-05-22 10:07:13 | 15 | 0.25 | SNOMED-CT | 430193006 | Medication reconciliation (procedure) | other | 761.55 | valid | procedures.csv | 2 |
+
+### `silver.observation` sample
+
+| observation_record_id | patient_id | encounter_id | observation_datetime_utc | observation_date | observation_category | observation_code | observation_description | observation_value_raw | observation_value_numeric | observation_units | observation_type | observation_quality_status | source_entity | bronze_ingestion_batch_id |
+|---:|---|---|---|---|---|---|---|---:|---:|---|---|---|---|---:|
+| 1 | 32b45c9c-6f3c-80cc-45e1-d93c2dd99161 | 32b45c9c-6f3c-80cc-5db4-a55c0d9b6eca | 2018-01-18 21:56:26 | 2018-01-18 | vital-signs | 74006-8 | Weight difference [Mass difference] --pre dialysis - post dialysis | 4.6 | 4.600000 | kg | numeric | valid | observations.csv | 2 |
+| 2 | 32b45c9c-6f3c-80cc-45e1-d93c2dd99161 | 32b45c9c-6f3c-80cc-5db4-a55c0d9b6eca | 2018-01-18 21:56:26 | 2018-01-18 | vital-signs | 72514-3 | Pain severity - 0-10 verbal numeric rating [Score] - Reported | 5.0 | 5.000000 | `{score}` | numeric | valid | observations.csv | 2 |
+| 3 | 32b45c9c-6f3c-80cc-45e1-d93c2dd99161 | 32b45c9c-6f3c-80cc-fc8d-d8f45790823c | 2018-01-22 01:38:26 | 2018-01-22 | vital-signs | 74006-8 | Weight difference [Mass difference] --pre dialysis - post dialysis | 1.1 | 1.100000 | kg | numeric | valid | observations.csv | 2 |
+
+## Silver Lineage Coverage Summary
+
+| Silver Table | Total Rows | Missing Batch ID | Missing Ingestion Datetime | Missing Source File | Missing Row Hash | Missing Load Status |
+|---|---:|---:|---:|---:|---:|---:|
+| `silver.patient` | 1,145 | 0 | 0 | 0 | 0 | 0 |
+| `silver.encounter` | 71,663 | 0 | 0 | 0 | 0 | 0 |
+| `silver.condition` | 43,758 | 0 | 0 | 0 | 0 | 0 |
+| `silver.procedure` | 196,207 | 0 | 0 | 0 | 0 | 0 |
+| `silver.observation` | 945,531 | 0 | 0 | 0 | 0 | 0 |
+
+Lineage coverage is complete across all current silver entities. Each silver row preserves the required bronze ingestion metadata and source-record hash.
+
+## Governance Quality Rule Summary
+
+| Quality Dimension | Severity | Rule Count |
+|---|---|---:|
+| completeness | critical | 2 |
+| completeness | high | 1 |
+| consistency | medium | 2 |
+| freshness | high | 1 |
+| lineage | critical | 1 |
+| referential_integrity | critical | 4 |
+| referential_integrity | medium | 3 |
+| uniqueness | critical | 2 |
+| uniqueness | medium | 1 |
+| validity | high | 4 |
+
+The governance rule catalog currently contains 21 active quality rules. Twenty rules are executable in `governance.vw_quality_check_current`; the lineage rule is documented in metadata and validated separately through lineage coverage checks.
+
+## Latest Persisted Quality Check Run
+
+| quality_check_run_id | persisted_result_rows | passed_checks | failed_checks | persisted_datetime |
+|---|---:|---:|---:|---|
+| ceeea4ad-e424-4b69-a693-2816f7631768 | 20 | 19 | 1 | 2026-05-31 19:22:37 |
+
+### Latest Run Result Summary
+
+| Quality Rule | Dimension | Target Table | Severity | Total Records | Failed Records | Pass Rate | Status |
+|---|---|---|---|---:|---:|---:|---|
+| DQ_ENCOUNTER_ID_COMPLETE | completeness | encounter | critical | 71,663 | 0 | 1.0000 | passed |
+| DQ_OBSERVATION_REQUIRED_FIELDS_COMPLETE | completeness | observation | high | 945,531 | 0 | 1.0000 | passed |
+| DQ_PATIENT_ID_COMPLETE | completeness | patient | critical | 1,145 | 0 | 1.0000 | passed |
+| DQ_ENCOUNTER_ID_UNIQUE | uniqueness | encounter | critical | 71,663 | 0 | 1.0000 | passed |
+| DQ_OBSERVATION_ROW_UNIQUE | uniqueness | observation | medium | 945,531 | 256 | 0.9997 | failed |
+| DQ_PATIENT_ID_UNIQUE | uniqueness | patient | critical | 1,145 | 0 | 1.0000 | passed |
+| DQ_CONDITION_ENCOUNTER_REF | referential_integrity | condition | medium | 43,758 | 0 | 1.0000 | passed |
+| DQ_CONDITION_PATIENT_REF | referential_integrity | condition | critical | 43,758 | 0 | 1.0000 | passed |
+| DQ_ENCOUNTER_PATIENT_REF | referential_integrity | encounter | critical | 71,663 | 0 | 1.0000 | passed |
+| DQ_OBSERVATION_ENCOUNTER_REF_WHEN_PRESENT | referential_integrity | observation | medium | 945,531 | 0 | 1.0000 | passed |
+| DQ_OBSERVATION_PATIENT_REF | referential_integrity | observation | critical | 945,531 | 0 | 1.0000 | passed |
+| DQ_PROCEDURE_ENCOUNTER_REF | referential_integrity | procedure | medium | 196,207 | 0 | 1.0000 | passed |
+| DQ_PROCEDURE_PATIENT_REF | referential_integrity | procedure | critical | 196,207 | 0 | 1.0000 | passed |
+| DQ_CONDITION_DATES_VALID | validity | condition | high | 43,758 | 0 | 1.0000 | passed |
+| DQ_ENCOUNTER_DATES_VALID | validity | encounter | high | 71,663 | 0 | 1.0000 | passed |
+| DQ_PATIENT_AGE_VALID | validity | patient | high | 1,145 | 0 | 1.0000 | passed |
+| DQ_PROCEDURE_DATES_VALID | validity | procedure | high | 196,207 | 0 | 1.0000 | passed |
+| DQ_ENCOUNTER_CLASS_CONSISTENT | consistency | encounter | medium | 71,663 | 0 | 1.0000 | passed |
+| DQ_OBSERVATION_CATEGORY_CONSISTENT | consistency | observation | medium | 945,531 | 0 | 1.0000 | passed |
+| DQ_SILVER_LOAD_FRESHNESS | freshness | all_current_silver | high | 5 | 0 | 1.0000 | passed |
+
+### Known Data Quality Finding
+
+`DQ_OBSERVATION_ROW_UNIQUE` detected 256 excess duplicate observation records under the current natural-grain definition: patient, encounter, observation datetime, observation code, raw observation value, and units. This is retained as a governed data-quality finding rather than hidden or suppressed. It should be reviewed before gold-layer lab/observation marts rely on observation counts.
+
