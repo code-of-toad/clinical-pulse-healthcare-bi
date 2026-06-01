@@ -968,3 +968,126 @@ LEFT JOIN governance.quality_rule q
 LEFT JOIN latest_run lr
     ON r.quality_check_run_id = lr.quality_check_run_id;
 GO
+
+
+
+/*
+Purpose: Create a reporting-ready patient flow mart for encounter trends and flow indicators.
+
+Assumptions:
+- The mart is implemented as a gold-layer view because it summarizes existing gold facts/dimensions.
+- The mart uses encounter start date as the primary reporting date.
+- unique_patients_in_group is distinct within the mart row grain and should not be summed across groups.
+*/
+
+GO
+
+CREATE OR ALTER VIEW gold.mart_patient_flow AS
+SELECT
+    dd.date_key AS encounter_start_date_key,
+    dd.full_date AS encounter_start_date,
+    dd.calendar_year,
+    dd.calendar_quarter,
+    dd.calendar_month,
+    dd.calendar_month_name,
+    dd.week_of_year,
+    dd.day_of_week,
+    dd.day_name,
+    dd.is_weekend,
+
+    dorg.organization_key,
+    dorg.organization_id,
+    COALESCE(dorg.organization_name, dorg.organization_id, 'Unknown Organization') AS organization_display_name,
+    dorg.organization_source_status,
+
+    dprov.provider_key,
+    dprov.provider_id,
+    COALESCE(dprov.provider_name, dprov.provider_id, 'Unknown Provider') AS provider_display_name,
+    dprov.provider_source_status,
+
+    dec.encounter_class_key,
+    dec.encounter_class,
+    dec.encounter_class_display,
+    dec.encounter_class_group,
+    dec.is_inpatient,
+    dec.is_emergency,
+    dec.is_ambulatory,
+
+    dp.age_band AS patient_age_band,
+    dp.gender AS patient_gender,
+    dp.race AS patient_race,
+    dp.ethnicity AS patient_ethnicity,
+    dp.state AS patient_state,
+    dp.county AS patient_county,
+
+    fe.encounter_datetime_quality_status,
+
+    SUM(fe.encounter_count) AS total_encounters,
+    SUM(fe.valid_encounter_count) AS valid_encounters,
+    COUNT(DISTINCT fe.patient_key) AS unique_patients_in_group,
+
+    SUM(CASE WHEN fe.length_of_stay_days IS NOT NULL THEN 1 ELSE 0 END) AS encounters_with_los,
+    SUM(CASE WHEN fe.length_of_stay_days IS NULL THEN 1 ELSE 0 END) AS encounters_without_los,
+
+    CAST(AVG(CAST(fe.length_of_stay_days AS DECIMAL(18,4))) AS DECIMAL(18,4)) AS average_los_days,
+    CAST(SUM(COALESCE(fe.length_of_stay_days, 0)) AS DECIMAL(18,4)) AS total_los_days,
+    SUM(COALESCE(fe.encounter_duration_minutes, 0)) AS total_encounter_duration_minutes,
+
+    SUM(CASE WHEN fe.length_of_stay_days < 1 THEN 1 ELSE 0 END) AS same_day_encounters,
+    SUM(CASE WHEN fe.length_of_stay_days >= 1 THEN 1 ELSE 0 END) AS multi_day_encounters,
+
+    SUM(CASE WHEN fe.is_missing_start_datetime = 1 THEN 1 ELSE 0 END) AS missing_start_datetime_encounters,
+    SUM(CASE WHEN fe.is_missing_stop_datetime = 1 THEN 1 ELSE 0 END) AS missing_stop_datetime_encounters,
+    SUM(CASE WHEN fe.is_stop_before_start = 1 THEN 1 ELSE 0 END) AS stop_before_start_encounters,
+
+    MAX(fe.gold_load_datetime) AS latest_gold_load_datetime
+FROM gold.fact_encounter fe
+LEFT JOIN gold.dim_date dd
+    ON fe.encounter_start_date_key = dd.date_key
+LEFT JOIN gold.dim_patient dp
+    ON fe.patient_key = dp.patient_key
+LEFT JOIN gold.dim_organization dorg
+    ON fe.organization_key = dorg.organization_key
+LEFT JOIN gold.dim_provider dprov
+    ON fe.provider_key = dprov.provider_key
+LEFT JOIN gold.dim_encounter_class dec
+    ON fe.encounter_class_key = dec.encounter_class_key
+GROUP BY
+    dd.date_key,
+    dd.full_date,
+    dd.calendar_year,
+    dd.calendar_quarter,
+    dd.calendar_month,
+    dd.calendar_month_name,
+    dd.week_of_year,
+    dd.day_of_week,
+    dd.day_name,
+    dd.is_weekend,
+
+    dorg.organization_key,
+    dorg.organization_id,
+    COALESCE(dorg.organization_name, dorg.organization_id, 'Unknown Organization'),
+    dorg.organization_source_status,
+
+    dprov.provider_key,
+    dprov.provider_id,
+    COALESCE(dprov.provider_name, dprov.provider_id, 'Unknown Provider'),
+    dprov.provider_source_status,
+
+    dec.encounter_class_key,
+    dec.encounter_class,
+    dec.encounter_class_display,
+    dec.encounter_class_group,
+    dec.is_inpatient,
+    dec.is_emergency,
+    dec.is_ambulatory,
+
+    dp.age_band,
+    dp.gender,
+    dp.race,
+    dp.ethnicity,
+    dp.state,
+    dp.county,
+
+    fe.encounter_datetime_quality_status;
+GO
