@@ -1,6 +1,6 @@
 # Database Schema Inventory
 
-This document records the current SQL Server table structures and representative sample values for the ClinicalPulse bronze, silver, audit, and governance schemas. It is intended to support reliable transformation work, data quality rule design, lineage documentation, and future assistant/project-source context.
+This document records the current SQL Server table structures, view structures, and representative sample values for the ClinicalPulse bronze, silver, gold, audit, and governance schemas. It is intended to support reliable transformation work, data quality rule design, lineage documentation, and future assistant/project-source context.
 
 ClinicalPulse uses synthetic Synthea data. The sample values below are not real patient data and should not be described as clinical evidence or production hospital records.
 
@@ -14,27 +14,16 @@ Those fields are documented in the schema inventory because they exist in bronze
 
 The current database inventory covers:
 
-| Schema | Object | Type |
+| Schema | Object Group | Type |
 |---|---|---|
-| `audit` | `ingestion_batch` | Table |
-| `audit` | `ingestion_file_log` | Table |
-| `bronze` | `patients` | Table |
-| `bronze` | `encounters` | Table |
-| `bronze` | `conditions` | Table |
-| `bronze` | `observations` | Table |
-| `bronze` | `procedures` | Table |
-| `bronze` | `organizations` | Table |
-| `bronze` | `providers` | Table |
-| `silver` | `patient` | Table |
-| `silver` | `encounter` | Table |
-| `silver` | `condition` | Table |
-| `silver` | `procedure` | Table |
-| `silver` | `observation` | Table |
-| `governance` | `quality_rule` | Table |
-| `governance` | `quality_check_result` | Table |
-| `governance` | `vw_quality_check_current` | View |
+| `audit` | ingestion batch and ingestion file log | Tables |
+| `bronze` | patients, encounters, conditions, observations, procedures, organizations, providers | Tables |
+| `silver` | patient, encounter, condition, procedure, observation | Tables |
+| `gold` | dimensions, facts, and reporting marts | Tables and views |
+| `governance` | quality rules, persisted quality-check results, current quality-check view | Tables and view |
+| `api` | FHIR/API demonstration views | Planned, not yet implemented |
 
-The current bronze model is source-preserving. Most source business fields are stored as `nvarchar` in bronze and are typed, standardized, and validated in silver. The governance layer stores quality rule metadata and persisted quality-check results.
+The current bronze model is source-preserving. Most source business fields are stored as `nvarchar` in bronze and are typed, standardized, and validated in silver. The gold layer contains reporting-ready dimensions, facts, and marts. The governance layer stores quality rule metadata and persisted quality-check results.
 
 ## Audit Load Snapshot
 
@@ -809,3 +798,258 @@ The governance rule catalog currently contains 21 active quality rules. Twenty r
 
 `DQ_OBSERVATION_ROW_UNIQUE` detected 256 excess duplicate observation records under the current natural-grain definition: patient, encounter, observation datetime, observation code, raw observation value, and units. This is retained as a governed data-quality finding rather than hidden or suppressed. It should be reviewed before gold-layer lab/observation marts rely on observation counts.
 
+
+## Sprint 5 Update: Gold Layer, Marts, and KPI Reconciliation
+
+Sprint 5 added the governed gold reporting layer used for Power BI-ready operational analytics. The gold layer now includes dimensions, facts, marts/views, KPI validation queries, and KPI reconciliation documentation.
+
+### Sprint 5 Deliverable Files
+
+| File | Purpose |
+|---|---|
+| `sql/04_create_gold_tables.sql` | Creates gold dimensions and gold fact tables. |
+| `sql/06_transform_silver_to_gold.sql` | Populates gold dimensions/facts and creates gold mart views. |
+| `sql/08_kpi_validation_queries.sql` | Provides independent SQL reconciliation queries for governed core KPIs. |
+| `docs/kpi_dictionary.md` | Defines governed KPI entries and source objects. |
+| `docs/kpi_validation_log.md` | Records KPI outputs reconciled to gold marts before Power BI work begins. |
+
+### Gold Object Inventory
+
+| Schema | Object | Type | Grain / Purpose | Current Row Count |
+|---|---|---|---|---:|
+| `gold` | `dim_patient` | Table | One row per synthetic patient; direct name/address identifiers excluded. | 1,145 |
+| `gold` | `dim_date` | Table | One row per calendar date across source date range. | 40,365 |
+| `gold` | `dim_organization` | Table | One row per organization identifier currently sourced from encounters. | 727 |
+| `gold` | `dim_provider` | Table | One row per provider identifier currently sourced from encounters. | 727 |
+| `gold` | `dim_encounter_class` | Table | One row per encounter class with reporting group flags. | 10 |
+| `gold` | `dim_condition` | Table | One row per distinct condition definition. | 268 |
+| `gold` | `dim_observation` | Table | One row per distinct observation definition. | 296 |
+| `gold` | `dim_procedure` | Table | One row per distinct procedure definition. | 363 |
+| `gold` | `fact_encounter` | Table | One row per encounter. | 71,663 |
+| `gold` | `fact_readmission` | Table | One row per eligible index encounter for 30-day readmission logic. | 71,663 |
+| `gold` | `fact_condition` | Table | One row per silver condition record. | 43,758 |
+| `gold` | `fact_observation` | Table | One row per silver observation record, including governed duplicate findings. | 945,531 |
+| `gold` | `fact_procedure` | Table | One row per silver procedure record. | 196,207 |
+| `gold` | `fact_data_quality_issue` | Table | One row per persisted governance quality-check result. | 20 |
+| `gold` | `mart_patient_flow` | View | Aggregated patient-flow reporting rows. | 68,981 |
+| `gold` | `mart_length_of_stay` | View | Encounter-grain LOS reporting mart. | 71,663 |
+| `gold` | `mart_readmissions` | View | Index-encounter-grain readmission reporting mart. | 71,663 |
+| `gold` | `mart_lab_operations` | View | Observation/lab activity reporting rows. | 935,704 |
+| `gold` | `mart_service_utilization` | View | Procedure/service utilization reporting rows. | 186,119 |
+| `gold` | `mart_reporting_trust` | View | Data-quality and governance-readiness reporting rows. | 20 |
+
+The gold marts are implemented as SQL views, so they appear under the database `Views` folder rather than the `Tables` folder.
+
+### Gold Dimension Summary
+
+#### `gold.dim_patient`
+
+Purpose: reporting-safe patient dimension. Direct identifiers such as names, SSN, passport, drivers, street address, and birthplace are excluded.
+
+Key columns:
+
+| Column Group | Columns |
+|---|---|
+| Key fields | `patient_key`, `patient_id` |
+| Demographics | `birth_date`, `death_date`, `is_deceased`, `age_reference_date`, `age_reference_type`, `age_years`, `age_band`, `gender`, `race`, `ethnicity`, `marital_status` |
+| Geography | `city`, `state`, `county`, `fips`, `zip`, `latitude`, `longitude` |
+| Quality and lineage | `patient_date_quality_status`, `source_system`, `source_entity`, `bronze_ingestion_batch_id`, `bronze_source_file`, `silver_load_datetime`, `gold_load_datetime` |
+
+#### `gold.dim_date`
+
+Purpose: standard reporting calendar dimension used by facts and marts.
+
+Columns: `date_key`, `full_date`, `calendar_year`, `calendar_quarter`, `calendar_month`, `calendar_month_name`, `day_of_month`, `day_of_week`, `day_name`, `week_of_year`, `is_weekend`.
+
+#### `gold.dim_organization`
+
+Purpose: lightweight organization reference dimension sourced from distinct `silver.encounter.organization_id` values until richer organization/provider silver dimensions are implemented.
+
+Columns: `organization_key`, `organization_id`, `organization_name`, `organization_source_status`, `gold_load_datetime`.
+
+#### `gold.dim_provider`
+
+Purpose: lightweight provider reference dimension sourced from distinct `silver.encounter.provider_id` values until richer provider silver dimensions are implemented.
+
+Columns: `provider_key`, `provider_id`, `provider_name`, `provider_source_status`, `gold_load_datetime`.
+
+#### `gold.dim_encounter_class`
+
+Purpose: standardized encounter-class slicer dimension.
+
+Columns: `encounter_class_key`, `encounter_class`, `encounter_class_display`, `encounter_class_group`, `is_inpatient`, `is_emergency`, `is_ambulatory`, `gold_load_datetime`.
+
+#### `gold.dim_condition`
+
+Purpose: condition definition dimension for case-mix reporting.
+
+Columns: `condition_key`, `condition_natural_key`, `condition_system`, `condition_code`, `condition_description`, `condition_category`, `gold_load_datetime`.
+
+#### `gold.dim_observation`
+
+Purpose: observation definition dimension for lab/observation reporting.
+
+Columns: `observation_key`, `observation_natural_key`, `observation_category`, `observation_code`, `observation_description`, `observation_units`, `observation_type`, `gold_load_datetime`.
+
+#### `gold.dim_procedure`
+
+Purpose: procedure definition dimension for service utilization reporting.
+
+Columns: `procedure_key`, `procedure_natural_key`, `procedure_system`, `procedure_code`, `procedure_description`, `procedure_category`, `gold_load_datetime`.
+
+### Gold Fact Summary
+
+#### `gold.fact_encounter`
+
+Purpose: encounter-grain fact supporting encounter volume, LOS, patient-flow, and encounter-class reporting.
+
+| Column Group | Columns |
+|---|---|
+| Fact key and natural key | `encounter_fact_key`, `encounter_id` |
+| Dimension keys | `patient_key`, `encounter_start_date_key`, `encounter_stop_date_key`, `organization_key`, `provider_key`, `encounter_class_key` |
+| Source references | `patient_id`, `organization_id`, `provider_id`, `payer_id` |
+| Timing and LOS | `encounter_start_datetime_utc`, `encounter_stop_datetime_utc`, `encounter_duration_minutes`, `encounter_duration_hours`, `length_of_stay_days` |
+| Encounter descriptors | `encounter_class`, `encounter_code`, `encounter_description`, `reason_code`, `reason_description` |
+| Cost fields | `base_encounter_cost`, `total_claim_cost`, `payer_coverage` |
+| Measures | `encounter_count`, `valid_encounter_count` |
+| Quality flags | `is_missing_start_datetime`, `is_missing_stop_datetime`, `is_invalid_start_datetime`, `is_invalid_stop_datetime`, `is_stop_before_start`, `encounter_datetime_quality_status` |
+| Lineage | `source_system`, `source_entity`, `bronze_ingestion_batch_id`, `bronze_source_file`, `silver_load_datetime`, `gold_load_datetime` |
+
+#### `gold.fact_readmission`
+
+Purpose: index-encounter-grain fact supporting 30-day readmission rate logic.
+
+| Column Group | Columns |
+|---|---|
+| Fact key | `readmission_fact_key` |
+| Index encounter | `index_encounter_fact_key`, `index_encounter_id`, `index_encounter_start_datetime_utc`, `index_encounter_stop_datetime_utc`, `index_start_date_key`, `index_stop_date_key`, `index_organization_key`, `index_provider_key`, `index_encounter_class_key` |
+| Patient reference | `patient_key`, `patient_id` |
+| Readmission encounter | `readmission_encounter_fact_key`, `readmission_encounter_id`, `readmission_start_datetime_utc`, `readmission_start_date_key` |
+| Interval fields | `days_to_readmission`, `hours_to_readmission`, `readmission_window_days` |
+| Measures and flags | `eligible_encounter_count`, `readmission_30_day_count`, `is_30_day_readmission`, `readmission_logic_status` |
+| Lineage | `gold_load_datetime` |
+
+Current readmission logic identifies the next encounter for the same patient after the index encounter stop time and flags it when it starts within 30 days. It does not distinguish planned versus unplanned readmissions.
+
+#### `gold.fact_condition`
+
+Purpose: condition-record-grain fact for case-mix reporting and condition context.
+
+Key columns: `condition_fact_key`, `condition_record_id`, `patient_key`, `encounter_fact_key`, `condition_key`, `condition_start_date_key`, `condition_stop_date_key`, `patient_id`, `encounter_id`, `condition_start_date`, `condition_stop_date`, `condition_duration_days`, `condition_system`, `condition_code`, `condition_description`, `condition_category`, `condition_status`, `condition_count`, `active_condition_count`, `resolved_condition_count`, `condition_date_quality_status`, lineage/load metadata.
+
+#### `gold.fact_observation`
+
+Purpose: observation-record-grain fact for lab/observation operations reporting.
+
+Key columns: `observation_fact_key`, `observation_record_id`, `patient_key`, `encounter_fact_key`, `observation_key`, `observation_date_key`, `organization_key`, `provider_key`, `encounter_class_key`, `patient_id`, `encounter_id`, `observation_datetime_utc`, `observation_date`, `observation_category`, `observation_code`, `observation_description`, `observation_value_raw`, `observation_value_numeric`, `observation_units`, `observation_type`, `observation_count`, `numeric_observation_count`, `encounter_linked_observation_count`, `patient_level_observation_count`, `observation_quality_status`, lineage/load metadata.
+
+Observation facts preserve governed duplicate records already identified by `DQ_OBSERVATION_ROW_UNIQUE`; they are not silently suppressed.
+
+#### `gold.fact_procedure`
+
+Purpose: procedure-record-grain fact for procedure volume and service utilization reporting.
+
+Key columns: `procedure_fact_key`, `procedure_record_id`, `patient_key`, `encounter_fact_key`, `procedure_key`, `procedure_start_date_key`, `procedure_stop_date_key`, `organization_key`, `provider_key`, `encounter_class_key`, `patient_id`, `encounter_id`, `procedure_start_datetime_utc`, `procedure_stop_datetime_utc`, `procedure_duration_minutes`, `procedure_duration_hours`, `procedure_system`, `procedure_code`, `procedure_description`, `procedure_category`, `base_procedure_cost`, `reason_code`, `reason_description`, `procedure_count`, `valid_procedure_count`, `procedure_datetime_quality_status`, lineage/load metadata.
+
+#### `gold.fact_data_quality_issue`
+
+Purpose: data-quality-result-grain fact for reporting trust and governance dashboards.
+
+Key columns: `data_quality_issue_fact_key`, `quality_check_result_id`, `quality_check_run_id`, `quality_rule_id`, `rule_name`, `quality_dimension`, `target_schema`, `target_table`, `target_column`, `target_object_name`, `rule_scope`, `severity`, `owner_role`, `steward_role`, `total_records`, `passed_records`, `failed_records`, `pass_rate`, `check_status`, `quality_check_count`, `passed_check_count`, `failed_check_count`, `issue_count`, `has_quality_issue`, `critical_issue_count`, `high_issue_count`, `medium_issue_count`, `low_issue_count`, `checked_datetime`, `persisted_datetime`, `run_source`, `is_latest_run`, `source_system`, `source_entity`, `gold_load_datetime`.
+
+### Gold Mart / View Summary
+
+#### `gold.mart_patient_flow`
+
+Purpose: aggregated patient-flow reporting by encounter start date, organization, provider, encounter class, patient demographic grouping, and encounter quality status.
+
+Core measures: `total_encounters`, `valid_encounters`, `unique_patients_in_group`, `encounters_with_los`, `encounters_without_los`, `average_los_days`, `total_los_days`, `total_encounter_duration_minutes`, `same_day_encounters`, `multi_day_encounters`, quality indicator counts.
+
+Caution: `unique_patients_in_group` is distinct within the mart row grain and should not be summed across rows.
+
+#### `gold.mart_length_of_stay`
+
+Purpose: encounter-grain LOS mart used for average and median LOS calculations.
+
+Core measures and fields: `encounter_fact_key`, `patient_key`, date keys, organization/provider/class keys, patient demographic grouping, condition/procedure summary counts, `length_of_stay_days`, `total_encounters`, `valid_encounters`, `los_eligible_encounter_count`, `los_days_numerator`, `same_day_encounter_count`, `multi_day_encounter_count`, `long_stay_encounter_count`, `los_bucket`, quality flags.
+
+#### `gold.mart_readmissions`
+
+Purpose: index-encounter-grain readmission mart used for 30-day readmission rate.
+
+Core measures and fields: `readmission_fact_key`, `index_encounter_fact_key`, `patient_key`, index encounter date keys, organization/provider/class keys, demographic grouping, condition summary fields, readmission encounter fields, `days_to_readmission`, `hours_to_readmission`, `readmission_rate_denominator`, `readmission_rate_numerator`, `is_30_day_readmission`, `no_subsequent_encounter_count`, `subsequent_encounter_after_30_days_count`, `readmission_logic_status`.
+
+#### `gold.mart_lab_operations`
+
+Purpose: observation/lab activity mart for dashboarding observation volume, numeric observation volume, encounter-linked observations, patient-level observations, and observation quality indicators.
+
+Core measures: `observation_volume`, `numeric_observation_count`, `encounter_linked_observation_count`, `patient_level_observation_count`, `unique_patients_in_group`, `unique_encounters_in_group`, `average_numeric_observation_value`, `minimum_numeric_observation_value`, `maximum_numeric_observation_value`, observation quality counts.
+
+Caution: Current lab operations scope includes all Synthea observation records. Synthea observations include both lab-like and vital-sign-like records, so stricter lab-only grouping may be refined later.
+
+#### `gold.mart_service_utilization`
+
+Purpose: procedure/service utilization mart for dashboarding procedure volume, procedure duration, procedure cost, and procedure quality indicators.
+
+Core measures: `procedure_volume`, `valid_procedure_count`, `unique_patients_in_group`, `unique_encounters_in_group`, `total_procedure_duration_minutes`, `total_procedure_duration_hours`, `average_procedure_duration_hours`, `total_base_procedure_cost`, `average_base_procedure_cost`, procedure quality counts.
+
+#### `gold.mart_reporting_trust`
+
+Purpose: data quality and governance readiness mart for reporting pass/fail status, issue severity, and reporting trust score.
+
+Core measures and fields: `quality_check_count`, `passed_check_count`, `failed_check_count`, `total_records_evaluated`, `passed_records`, `failed_records`, `issue_count`, `quality_issue_rule_count`, severity issue counts, `check_pass_rate`, `record_pass_rate`, `reporting_trust_score`, `reporting_readiness_status`, `is_reporting_ready`, `has_failed_checks`, `has_record_level_issues`, `distinct_quality_rule_count`.
+
+### Sprint 5 Validation Summary
+
+| User Story | Deliverable Area | Validation Result |
+|---|---|---|
+| AB#1504 | Gold dimensions | 30 checks passed, 0 failed |
+| AB#1508 | Encounter and readmission facts | 26 checks passed, 0 failed |
+| AB#1512 | Condition, observation, and procedure facts | 48 checks passed, 0 failed |
+| AB#1516 | Data quality issue fact | 20 checks passed, 0 failed |
+| AB#1521 | Patient flow mart | 22 checks passed, 0 failed |
+| AB#1525 | LOS and readmission marts | 32 checks passed, 0 failed |
+| AB#1529 | Lab operations and service utilization marts | 33 checks passed, 0 failed |
+| AB#1533 | Reporting trust mart | 23 checks passed, 0 failed |
+| AB#1554 | KPI dictionary entries | 202 checks passed, 0 failed |
+| AB#1557 | SQL KPI validation queries | 42 file-level checks passed, 0 failed; SQL KPI validation returned 10 passed, 0 failed, 1 expected not-implemented API coverage item |
+| AB#1561 | KPI validation log | Documents reconciled KPI outputs to gold marts |
+
+### Reconciled KPI Outputs
+
+| KPI | Reconciled Value | Status |
+|---|---:|---|
+| Total Encounters | 71,663 | Passed |
+| Unique Patients | 1,145 | Passed |
+| Average Length of Stay | 0.247679 days | Passed |
+| Median Length of Stay | 0.033700 days | Passed |
+| 30-Day Readmission Rate | 0.643707 | Passed |
+| 30-Day Readmission Numerator | 46,130 | Passed |
+| 30-Day Readmission Denominator | 71,663 | Passed |
+| Observation Volume | 945,531 | Passed |
+| Procedure Volume | 196,207 | Passed |
+| Data Quality Pass Rate | 0.950000 | Passed |
+| API Resource Coverage | 0.000000 | Not implemented |
+
+API Resource Coverage is expected to remain `not_implemented` until the API/FHIR views are built. This is not a failure of the current gold layer.
+
+### Portfolio-Safety Notes for Gold
+
+- Gold dimensions and marts are reporting-facing assets and should avoid direct patient identifiers.
+- `gold.dim_patient` excludes names, SSN, passport, drivers, street address, and birthplace.
+- Aggregated marts exclude direct patient/source identifier columns such as `patient_id`, `encounter_id`, `observation_record_id`, `procedure_record_id`, and direct name/address identifiers.
+- Some gold fact tables retain source IDs such as `patient_id` and `encounter_id` for lineage, reconciliation, and fact-to-fact joining. These are technical/reporting-layer keys and should not be exposed casually in public screenshots.
+- ClinicalPulse uses synthetic Synthea data and does not represent real patients, real hospital performance, or clinical decision-support evidence.
+
+### Pending Database Objects
+
+The following API/FHIR objects are defined in KPI documentation but are not yet implemented:
+
+| Planned Object | Current Status |
+|---|---|
+| `api.vw_fhir_patient` | Not implemented |
+| `api.vw_fhir_encounter` | Not implemented |
+| `api.vw_fhir_observation` | Not implemented |
+| `api.vw_fhir_condition` | Not implemented |
+
+These planned objects support the later FHIR/API demonstration scope and should not be counted as missing gold-layer assets.
