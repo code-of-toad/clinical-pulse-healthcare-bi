@@ -18,6 +18,7 @@ SET DATEFIRST 7;
 
 DECLARE @gold_load_datetime DATETIME2 = SYSUTCDATETIME();
 
+TRUNCATE TABLE gold.fact_data_quality_issue;
 TRUNCATE TABLE gold.fact_observation;
 TRUNCATE TABLE gold.fact_procedure;
 TRUNCATE TABLE gold.fact_condition;
@@ -833,4 +834,137 @@ LEFT JOIN gold.dim_date d_start
     ON p.procedure_start_date = d_start.full_date
 LEFT JOIN gold.dim_date d_stop
     ON p.procedure_stop_date = d_stop.full_date;
+GO
+
+DECLARE @gold_load_datetime DATETIME2 = SYSUTCDATETIME();
+
+;WITH latest_run AS (
+    SELECT TOP (1)
+        quality_check_run_id
+    FROM governance.quality_check_result
+    GROUP BY quality_check_run_id
+    ORDER BY
+        MAX(persisted_datetime) DESC,
+        quality_check_run_id
+)
+INSERT INTO gold.fact_data_quality_issue (
+    quality_check_result_id,
+    quality_check_run_id,
+    quality_rule_id,
+    rule_name,
+    quality_dimension,
+    target_schema,
+    target_table,
+    target_column,
+    target_object_name,
+    rule_scope,
+    severity,
+    owner_role,
+    steward_role,
+    total_records,
+    passed_records,
+    failed_records,
+    pass_rate,
+    check_status,
+    quality_check_count,
+    passed_check_count,
+    failed_check_count,
+    issue_count,
+    has_quality_issue,
+    critical_issue_count,
+    high_issue_count,
+    medium_issue_count,
+    low_issue_count,
+    checked_datetime,
+    persisted_datetime,
+    run_source,
+    is_latest_run,
+    source_system,
+    source_entity,
+    gold_load_datetime
+)
+SELECT
+    r.quality_check_result_id,
+    r.quality_check_run_id,
+    r.quality_rule_id,
+    r.rule_name,
+    r.quality_dimension,
+    r.target_schema,
+    r.target_table,
+    r.target_column,
+    CONCAT(r.target_schema, '.', r.target_table) AS target_object_name,
+    r.rule_scope,
+    r.severity,
+    q.owner_role,
+    q.steward_role,
+    r.total_records,
+    r.passed_records,
+    r.failed_records,
+    r.pass_rate,
+    r.check_status,
+
+    1 AS quality_check_count,
+
+    CASE
+        WHEN r.check_status = 'passed' THEN 1
+        ELSE 0
+    END AS passed_check_count,
+
+    CASE
+        WHEN r.check_status = 'failed' THEN 1
+        ELSE 0
+    END AS failed_check_count,
+
+    r.failed_records AS issue_count,
+
+    CASE
+        WHEN r.failed_records > 0 OR r.check_status = 'failed' THEN 1
+        ELSE 0
+    END AS has_quality_issue,
+
+    CASE
+        WHEN LOWER(r.severity) = 'critical'
+         AND (r.failed_records > 0 OR r.check_status = 'failed')
+        THEN r.failed_records
+        ELSE 0
+    END AS critical_issue_count,
+
+    CASE
+        WHEN LOWER(r.severity) = 'high'
+         AND (r.failed_records > 0 OR r.check_status = 'failed')
+        THEN r.failed_records
+        ELSE 0
+    END AS high_issue_count,
+
+    CASE
+        WHEN LOWER(r.severity) = 'medium'
+         AND (r.failed_records > 0 OR r.check_status = 'failed')
+        THEN r.failed_records
+        ELSE 0
+    END AS medium_issue_count,
+
+    CASE
+        WHEN LOWER(r.severity) = 'low'
+         AND (r.failed_records > 0 OR r.check_status = 'failed')
+        THEN r.failed_records
+        ELSE 0
+    END AS low_issue_count,
+
+    r.checked_datetime,
+    r.persisted_datetime,
+    r.run_source,
+
+    CASE
+        WHEN lr.quality_check_run_id IS NOT NULL THEN 1
+        ELSE 0
+    END AS is_latest_run,
+
+    'ClinicalPulse Governance' AS source_system,
+    'governance.quality_check_result' AS source_entity,
+    @gold_load_datetime
+FROM governance.quality_check_result r
+LEFT JOIN governance.quality_rule q
+    ON r.quality_rule_id = q.quality_rule_id
+LEFT JOIN latest_run lr
+    ON r.quality_check_run_id = lr.quality_check_run_id;
 GO

@@ -22,6 +22,9 @@ BEGIN
 END;
 GO
 
+DROP TABLE IF EXISTS gold.fact_data_quality_issue;
+GO
+
 DROP TABLE IF EXISTS gold.fact_observation;
 DROP TABLE IF EXISTS gold.fact_procedure;
 DROP TABLE IF EXISTS gold.fact_condition;
@@ -408,3 +411,53 @@ CREATE TABLE gold.fact_procedure (
     CONSTRAINT uq_fact_procedure_record_id UNIQUE (procedure_record_id)
 );
 GO
+
+CREATE TABLE gold.fact_data_quality_issue (
+    data_quality_issue_fact_key INT IDENTITY(1,1) NOT NULL CONSTRAINT pk_fact_data_quality_issue PRIMARY KEY,
+
+    quality_check_result_id BIGINT NOT NULL,
+    quality_check_run_id UNIQUEIDENTIFIER NOT NULL,
+    quality_rule_id NVARCHAR(80) NOT NULL,
+    rule_name NVARCHAR(200) NOT NULL,
+
+    quality_dimension NVARCHAR(50) NOT NULL,
+    target_schema NVARCHAR(128) NOT NULL,
+    target_table NVARCHAR(128) NOT NULL,
+    target_column NVARCHAR(128) NULL,
+    target_object_name NVARCHAR(300) NOT NULL,
+    rule_scope NVARCHAR(50) NOT NULL,
+    severity NVARCHAR(20) NOT NULL,
+
+    owner_role NVARCHAR(100) NULL,
+    steward_role NVARCHAR(100) NULL,
+
+    total_records BIGINT NOT NULL,
+    passed_records BIGINT NOT NULL,
+    failed_records BIGINT NOT NULL,
+    pass_rate DECIMAL(9,4) NOT NULL,
+    check_status NVARCHAR(20) NOT NULL,
+
+    quality_check_count INT NOT NULL,
+    passed_check_count INT NOT NULL,
+    failed_check_count INT NOT NULL,
+    issue_count BIGINT NOT NULL,
+    has_quality_issue BIT NOT NULL,
+
+    critical_issue_count BIGINT NOT NULL,
+    high_issue_count BIGINT NOT NULL,
+    medium_issue_count BIGINT NOT NULL,
+    low_issue_count BIGINT NOT NULL,
+
+    checked_datetime DATETIME2 NOT NULL,
+    persisted_datetime DATETIME2 NOT NULL,
+    run_source NVARCHAR(100) NOT NULL,
+    is_latest_run BIT NOT NULL,
+
+    source_system NVARCHAR(100) NOT NULL,
+    source_entity NVARCHAR(100) NOT NULL,
+    gold_load_datetime DATETIME2 NOT NULL CONSTRAINT df_fact_data_quality_issue_gold_load_datetime DEFAULT SYSUTCDATETIME(),
+
+    CONSTRAINT uq_fact_data_quality_issue_result_id UNIQUE (quality_check_result_id)
+);
+GO
+
