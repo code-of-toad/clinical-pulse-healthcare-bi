@@ -2,9 +2,9 @@
 
 ## 1. Purpose
 
-This document defines the standard structure for ClinicalPulse KPI definitions.
+This document defines the governed KPI entries for ClinicalPulse.
 
-The KPI dictionary exists to prevent conflicting interpretations of dashboard metrics. Each metric used in ClinicalPulse should have a documented business question, plain-language definition, formal calculation approach, source objects, validation expectation, ownership, and known limitations before it is treated as reporting-ready.
+The KPI dictionary exists to prevent conflicting interpretations of dashboard metrics. Each ClinicalPulse KPI should have a documented business question, definition, formal formula, grain, source objects, validation approach, ownership, limitations, and data quality dependencies before it is treated as reporting-ready.
 
 ## 2. Intended Audience
 
@@ -15,255 +15,224 @@ This document is intended for:
 - operational stakeholders who need to understand what each metric means
 - technical reviewers who need to trace dashboard numbers back to source and transformation logic
 
-## 3. How the KPI Dictionary Will Be Used
+## 3. KPI Governance Rules
 
-ClinicalPulse will use this document as the standard reference for metric definitions across SQL Server, Power BI, governance documentation, and FHIR/API demonstrations where relevant.
-
-A KPI should not be considered final until its dictionary entry defines:
-
-- what business question the metric answers
-- what records are included or excluded
-- what grain the metric is measured at
-- which SQL objects support the metric
-- which Power BI measure represents the metric
-- how the metric can be validated
-- what limitations or data quality dependencies affect interpretation
+- KPI names should remain stable once used in dashboards.
+- Power BI measures should reconcile to SQL validation queries.
+- Gold-layer facts, dimensions, and marts are the authoritative reporting layer for implemented KPIs.
+- Synthetic-data limitations must remain visible where they affect interpretation.
+- Changes to KPI definitions should be documented before dashboard values are refreshed or presented.
 
 ## 4. Required KPI Definition Fields
 
 | Field | Purpose |
 |---|---|
-| KPI name | The business-facing name of the metric. |
-| Business question | The operational question the KPI helps answer. |
-| Plain-English definition | A concise explanation of what the KPI means. |
-| Formal formula | The calculation logic expressed in precise terms. |
-| Grain | The level at which the metric is calculated, such as encounter, patient, organization, date, or dashboard filter context. |
-| Inclusion criteria | Records that should be included in the calculation. |
-| Exclusion criteria | Records that should be excluded from the calculation. |
-| SQL source objects | Bronze, silver, gold, mart, or view objects used to calculate the KPI. |
-| Power BI measure name | The planned or implemented DAX measure name. |
-| Owner | The accountable business or project role for the KPI. |
-| Steward | The role responsible for definition quality, documentation, and review. |
-| Refresh frequency | Expected refresh cadence once the reporting layer is implemented. |
-| Validation query | SQL query or validation method used to reconcile the KPI. |
-| Data quality dependencies | Data quality checks that affect whether the KPI can be trusted. |
+| KPI name | Business-facing metric name. |
+| Business question | Operational question the KPI helps answer. |
+| Plain-English definition | Concise explanation of what the KPI means. |
+| Formal formula | Precise calculation logic. |
+| Grain | Level at which the metric is calculated. |
+| Inclusion criteria | Records included in the calculation. |
+| Exclusion criteria | Records excluded from the calculation. |
+| SQL source objects | SQL objects used to calculate or validate the KPI. |
+| Power BI measure name | Planned or implemented DAX measure name. |
+| Owner | Accountable business or project role. |
+| Steward | Role responsible for definition quality and review. |
+| Refresh frequency | Expected refresh cadence. |
+| Validation query | SQL validation approach used to reconcile the KPI. |
+| Data quality dependencies | Data quality checks that affect trust. |
 | Known limitations | Interpretation limits, assumptions, or caveats. |
-| Related dashboard page | Dashboard page where the KPI is expected to appear. |
+| Related dashboard page | Dashboard page where the KPI appears or is planned. |
 | Related FHIR resources | FHIR-style resources related to the KPI, where applicable. |
-| Status | Draft, defined, implemented, validated, or retired. |
+| Status | Draft, Defined, Implemented, Validated, or Retired. |
 
-## 5. Standard KPI Entry Template
+## 5. Core KPI Entries
 
-```text
-KPI name:
-Business question:
-Plain-English definition:
-Formal formula:
-Grain:
-Inclusion criteria:
-Exclusion criteria:
-SQL source objects:
-Power BI measure name:
-Owner:
-Steward:
-Refresh frequency:
-Validation query:
-Data quality dependencies:
-Known limitations:
-Related dashboard page:
-Related FHIR resources:
-Status:
-```
-
-## 6. Initial KPI Skeleton
-
-The following KPI entries define the starting structure for ClinicalPulse. Calculation logic will be refined as the SQL Server model, gold reporting layer, and Power BI semantic model are implemented.
-
-### 6.1 Total Encounters
+### 5.1 Total Encounters
 
 | Field | Definition |
 |---|---|
 | KPI name | Total Encounters |
 | Business question | How many healthcare encounters occurred in the selected reporting period? |
-| Plain-English definition | Count of encounters that meet the selected reporting filters. |
-| Formal formula | Count of eligible encounter records. |
-| Grain | Encounter. |
-| Inclusion criteria | Encounters within the selected date range and reporting scope. |
-| Exclusion criteria | Encounters with invalid or unusable encounter identifiers; additional exclusions to be defined during implementation. |
-| SQL source objects | `silver.encounter`; planned gold object: `gold.fact_encounter`; planned mart: `gold.mart_patient_flow`. |
+| Plain-English definition | Count of eligible encounter records represented in the gold reporting layer. |
+| Formal formula | `SUM(gold.fact_encounter.encounter_count)` or `SUM(gold.mart_patient_flow.total_encounters)` within the selected filter context. |
+| Grain | Encounter, aggregated by dashboard filter context. |
+| Inclusion criteria | Encounters loaded into `gold.fact_encounter` with a valid encounter identifier. |
+| Exclusion criteria | Records without a usable encounter identifier. Additional dashboard-specific exclusions must be documented where applied. |
+| SQL source objects | `silver.encounter`; `gold.fact_encounter`; `gold.mart_patient_flow`; `gold.mart_length_of_stay`. |
 | Power BI measure name | `Total Encounters` |
 | Owner | Operational Reporting Owner |
 | Steward | Data Steward |
-| Refresh frequency | To be defined during reporting implementation. |
-| Validation query | Count eligible records from the gold encounter fact or patient flow mart and reconcile against the Power BI measure. |
-| Data quality dependencies | Encounter identifier completeness, encounter date validity, source-to-silver row reconciliation. |
-| Known limitations | Encounter class and reporting date logic must be clearly defined before final use. |
+| Refresh frequency | On gold-layer refresh. |
+| Validation query | Reconcile `SUM(encounter_count)` from `gold.fact_encounter` to `SUM(total_encounters)` from `gold.mart_patient_flow`. |
+| Data quality dependencies | Encounter identifier completeness, encounter identifier uniqueness, encounter date validity, encounter-to-patient referential integrity. |
+| Known limitations | Synthetic encounter volume does not represent real hospital utilization. Encounter class and date filters must be clearly communicated. |
 | Related dashboard page | Executive Overview; Patient Flow |
 | Related FHIR resources | Encounter |
-| Status | Draft |
+| Status | Defined |
 
-### 6.2 Unique Patients
+### 5.2 Unique Patients
 
 | Field | Definition |
 |---|---|
 | KPI name | Unique Patients |
-| Business question | How many distinct synthetic patients had at least one encounter in the selected reporting scope? |
-| Plain-English definition | Count of distinct patients represented in eligible encounters. |
-| Formal formula | Distinct count of patient identifiers among eligible encounter records. |
-| Grain | Patient within reporting filter context. |
-| Inclusion criteria | Patients with at least one eligible encounter in scope. |
-| Exclusion criteria | Patient records not linked to an eligible encounter; records with invalid patient identifiers. |
-| SQL source objects | `silver.patient`, `silver.encounter`; planned gold objects: `gold.dim_patient`, `gold.fact_encounter`. |
+| Business question | How many distinct synthetic patients had at least one eligible encounter in the selected reporting scope? |
+| Plain-English definition | Count of distinct patients represented in eligible encounter activity. |
+| Formal formula | `COUNT(DISTINCT gold.fact_encounter.patient_key)` within the selected filter context. |
+| Grain | Patient within dashboard filter context. |
+| Inclusion criteria | Patient keys linked to eligible encounter records in `gold.fact_encounter`. |
+| Exclusion criteria | Encounter records without a resolvable patient key. |
+| SQL source objects | `silver.patient`; `silver.encounter`; `gold.dim_patient`; `gold.fact_encounter`; `gold.mart_patient_flow`. |
 | Power BI measure name | `Unique Patients` |
 | Owner | Operational Reporting Owner |
 | Steward | Data Steward |
-| Refresh frequency | To be defined during reporting implementation. |
-| Validation query | Distinct count patient keys from eligible encounter records in the gold layer. |
-| Data quality dependencies | Patient identifier completeness, encounter-to-patient referential integrity. |
-| Known limitations | Synthetic population does not represent a real hospital catchment area. |
+| Refresh frequency | On gold-layer refresh. |
+| Validation query | Recalculate distinct `patient_key` from `gold.fact_encounter` under the same date and slicer filters used in Power BI. |
+| Data quality dependencies | Patient identifier completeness, patient identifier uniqueness, encounter-to-patient referential integrity. |
+| Known limitations | `unique_patients_in_group` in marts is distinct only within each mart row and should not be summed across grouped rows. The synthetic population does not represent a real hospital catchment area. |
 | Related dashboard page | Executive Overview; Patient Flow |
 | Related FHIR resources | Patient; Encounter |
-| Status | Draft |
+| Status | Defined |
 
-### 6.3 Average Length of Stay
+### 5.3 Average Length of Stay
 
 | Field | Definition |
 |---|---|
 | KPI name | Average Length of Stay |
-| Business question | How long do patients remain in care, on average, for selected encounter classes or reporting groups? |
-| Plain-English definition | Average duration between encounter start and stop timestamps for eligible encounters. |
-| Formal formula | Sum of eligible encounter durations divided by count of eligible encounters. |
+| Business question | How long do patients remain in care on average for selected encounter classes or reporting groups? |
+| Plain-English definition | Average duration between encounter start and stop timestamps for LOS-eligible encounters. |
+| Formal formula | `SUM(gold.mart_length_of_stay.los_days_numerator) / SUM(gold.mart_length_of_stay.los_eligible_encounter_count)`. |
 | Grain | Encounter, aggregated by dashboard filter context. |
-| Inclusion criteria | Encounters with valid start and stop timestamps. Encounter class scope to be defined during implementation. |
-| Exclusion criteria | Encounters with missing stop time, missing start time, stop before start, or negative duration. |
-| SQL source objects | `silver.encounter`; planned gold object: `gold.fact_encounter`; planned mart: `gold.mart_length_of_stay`. |
+| Inclusion criteria | Encounters with valid start and stop timestamps and non-null `length_of_stay_days`. |
+| Exclusion criteria | Encounters with missing start time, missing stop time, stop before start, invalid timestamps, or null LOS. |
+| SQL source objects | `silver.encounter`; `gold.fact_encounter`; `gold.mart_length_of_stay`; `gold.dim_encounter_class`; `gold.dim_date`. |
 | Power BI measure name | `Average LOS` |
 | Owner | Operational Reporting Owner |
 | Steward | Data Steward |
-| Refresh frequency | To be defined during reporting implementation. |
-| Validation query | Recalculate average encounter duration from the gold length-of-stay mart and reconcile against the Power BI measure. |
-| Data quality dependencies | Encounter timestamp validity, duration derivation logic, invalid-date flags. |
-| Known limitations | Average LOS can be affected by long-stay outliers and synthetic data patterns. |
-| Related dashboard page | Executive Overview; Patient Flow |
+| Refresh frequency | On gold-layer refresh. |
+| Validation query | Reconcile `SUM(los_days_numerator) / SUM(los_eligible_encounter_count)` from `gold.mart_length_of_stay` to the Power BI measure. |
+| Data quality dependencies | Encounter timestamp validity, duration derivation logic, invalid-date flags, encounter class consistency. |
+| Known limitations | Average LOS is sensitive to long-stay outliers and synthetic data patterns. |
+| Related dashboard page | Executive Overview; Patient Flow; Length of Stay |
 | Related FHIR resources | Encounter |
-| Status | Draft |
+| Status | Defined |
 
-### 6.4 Median Length of Stay
+### 5.4 Median Length of Stay
 
 | Field | Definition |
 |---|---|
 | KPI name | Median Length of Stay |
 | Business question | What is the typical encounter duration after reducing the influence of long-stay outliers? |
-| Plain-English definition | Median duration between encounter start and stop timestamps for eligible encounters. |
-| Formal formula | Median of eligible encounter durations. |
+| Plain-English definition | Median `length_of_stay_days` among LOS-eligible encounters. |
+| Formal formula | Median of `gold.mart_length_of_stay.length_of_stay_days` where `los_eligible_encounter_count = 1`. |
 | Grain | Encounter, aggregated by dashboard filter context. |
-| Inclusion criteria | Encounters with valid start and stop timestamps. Encounter class scope to be defined during implementation. |
-| Exclusion criteria | Encounters with missing stop time, missing start time, stop before start, or negative duration. |
-| SQL source objects | `silver.encounter`; planned gold object: `gold.fact_encounter`; planned mart: `gold.mart_length_of_stay`. |
+| Inclusion criteria | Encounters with valid start and stop timestamps and non-null `length_of_stay_days`. |
+| Exclusion criteria | Encounters with missing start time, missing stop time, stop before start, invalid timestamps, or null LOS. |
+| SQL source objects | `silver.encounter`; `gold.fact_encounter`; `gold.mart_length_of_stay`; `gold.dim_encounter_class`; `gold.dim_date`. |
 | Power BI measure name | `Median LOS` |
 | Owner | Operational Reporting Owner |
 | Steward | Data Steward |
-| Refresh frequency | To be defined during reporting implementation. |
-| Validation query | Recalculate median encounter duration from the gold length-of-stay mart and reconcile against the Power BI measure. |
-| Data quality dependencies | Encounter timestamp validity, duration derivation logic, invalid-date flags. |
-| Known limitations | Median LOS requires a clearly defined duration unit and encounter inclusion scope. |
-| Related dashboard page | Executive Overview; Patient Flow |
+| Refresh frequency | On gold-layer refresh. |
+| Validation query | Recalculate the median over `gold.mart_length_of_stay.length_of_stay_days` where `los_eligible_encounter_count = 1` and reconcile to the Power BI measure. |
+| Data quality dependencies | Encounter timestamp validity, duration derivation logic, invalid-date flags, encounter class consistency. |
+| Known limitations | Median LOS requires filter context to be clear. It should be interpreted alongside encounter class and organization filters. |
+| Related dashboard page | Executive Overview; Patient Flow; Length of Stay |
 | Related FHIR resources | Encounter |
-| Status | Draft |
+| Status | Defined |
 
-### 6.5 30-Day Readmission Rate
+### 5.5 30-Day Readmission Rate
 
 | Field | Definition |
 |---|---|
 | KPI name | 30-Day Readmission Rate |
 | Business question | What percentage of eligible encounters are followed by another encounter for the same patient within 30 days? |
-| Plain-English definition | Percentage of eligible index encounters with a subsequent encounter for the same patient within 30 days. |
-| Formal formula | Eligible index encounters followed by a subsequent encounter within 30 days divided by total eligible index encounters. |
+| Plain-English definition | Percentage of eligible index encounters that have a subsequent encounter for the same patient within 30 days of the index encounter stop time. |
+| Formal formula | `SUM(gold.mart_readmissions.readmission_rate_numerator) / SUM(gold.mart_readmissions.readmission_rate_denominator)`. |
 | Grain | Index encounter. |
-| Inclusion criteria | Eligible completed encounters with patient identifier and valid encounter end date. |
-| Exclusion criteria | Encounters without valid patient linkage or valid timing fields; planned versus unplanned logic to be defined as an assumption. |
-| SQL source objects | `silver.encounter`, `silver.condition`; planned gold objects: `gold.fact_encounter`, `gold.fact_readmission`; planned mart: `gold.mart_readmissions`. |
+| Inclusion criteria | Eligible completed encounters with patient linkage, valid start timestamp, valid stop timestamp, and stop time greater than or equal to start time. |
+| Exclusion criteria | Encounters without valid patient linkage or valid timing fields. |
+| SQL source objects | `silver.encounter`; `gold.fact_encounter`; `gold.fact_readmission`; `gold.mart_readmissions`; `gold.dim_patient`; `gold.dim_encounter_class`; `gold.dim_date`. |
 | Power BI measure name | `30-Day Readmission Rate` |
 | Owner | Operational Reporting Owner |
 | Steward | Data Steward |
-| Refresh frequency | To be defined during reporting implementation. |
-| Validation query | Recalculate readmission numerator and denominator from the gold readmission fact or mart. |
+| Refresh frequency | On gold-layer refresh. |
+| Validation query | Reconcile `SUM(readmission_rate_numerator)` and `SUM(readmission_rate_denominator)` from `gold.mart_readmissions` to `gold.fact_readmission` and the Power BI measure. |
 | Data quality dependencies | Patient linkage, encounter date validity, encounter sequencing, duplicate encounter checks. |
-| Known limitations | Planned versus unplanned readmission logic may not be fully available in synthetic data and must be documented. |
+| Known limitations | Current logic is demonstration-grade. It identifies the next encounter for the same patient within 30 days and does not distinguish planned versus unplanned readmissions. The result should not be interpreted as a real hospital readmission rate. |
 | Related dashboard page | Executive Overview; Readmissions |
 | Related FHIR resources | Patient; Encounter; Condition |
-| Status | Draft |
+| Status | Defined |
 
-### 6.6 Observation Volume
+### 5.6 Observation Volume
 
 | Field | Definition |
 |---|---|
 | KPI name | Observation Volume |
 | Business question | How much lab or clinical observation activity occurred in the selected reporting scope? |
-| Plain-English definition | Count of observation records by reporting period, observation type, encounter, patient group, or organization. |
-| Formal formula | Count of eligible observation records. |
-| Grain | Observation. |
-| Inclusion criteria | Observation records linked to valid patients and, where required, valid encounters. |
-| Exclusion criteria | Observations with missing required identifiers or invalid source linkage. |
-| SQL source objects | `silver.observation`; planned gold object: `gold.fact_observation`; planned mart: `gold.mart_lab_operations`. |
+| Plain-English definition | Count of eligible observation records in the gold reporting layer. |
+| Formal formula | `SUM(gold.mart_lab_operations.observation_volume)`. |
+| Grain | Observation, aggregated by dashboard filter context. |
+| Inclusion criteria | Observation records loaded into `gold.fact_observation`. |
+| Exclusion criteria | Observation records excluded by dashboard filters or future documented lab-only classification rules. |
+| SQL source objects | `silver.observation`; `gold.fact_observation`; `gold.dim_observation`; `gold.mart_lab_operations`; `gold.dim_date`; `gold.dim_encounter_class`. |
 | Power BI measure name | `Observation Volume` |
 | Owner | Operational Reporting Owner |
 | Steward | Data Steward |
-| Refresh frequency | To be defined during reporting implementation. |
-| Validation query | Count eligible observation records from the gold observation fact or lab operations mart. |
-| Data quality dependencies | Observation identifier completeness, patient and encounter linkage, observation code completeness. |
-| Known limitations | Synthea observations may include both lab-like and vital-sign-like records; category logic must be documented. |
+| Refresh frequency | On gold-layer refresh. |
+| Validation query | Reconcile `SUM(observation_count)` from `gold.fact_observation` to `SUM(observation_volume)` from `gold.mart_lab_operations`. |
+| Data quality dependencies | Observation patient linkage, observation encounter linkage when present, observation code completeness, observation datetime validity, duplicate observation findings. |
+| Known limitations | Synthea observations include both lab-like and vital-sign-like records. Strict lab-only grouping may be refined later. Governed duplicate observation findings should remain visible and not be silently suppressed. |
 | Related dashboard page | Executive Overview; Lab / Observation Operations |
 | Related FHIR resources | Observation; Patient; Encounter |
-| Status | Draft |
+| Status | Defined |
 
-### 6.7 Procedure Volume
+### 5.7 Procedure Volume
 
 | Field | Definition |
 |---|---|
 | KPI name | Procedure Volume |
 | Business question | Which procedures or procedure groups contribute the greatest operational volume? |
-| Plain-English definition | Count of procedure records by reporting period, procedure category, encounter class, or organization. |
-| Formal formula | Count of eligible procedure records. |
-| Grain | Procedure. |
-| Inclusion criteria | Procedure records linked to valid patients and encounters where required. |
-| Exclusion criteria | Procedure records with missing required identifiers or invalid source linkage. |
-| SQL source objects | `silver.procedure`; planned gold object: `gold.fact_procedure`; planned mart: `gold.mart_service_utilization`. |
+| Plain-English definition | Count of eligible procedure records in the gold reporting layer. |
+| Formal formula | `SUM(gold.mart_service_utilization.procedure_volume)`. |
+| Grain | Procedure, aggregated by dashboard filter context. |
+| Inclusion criteria | Procedure records loaded into `gold.fact_procedure`. |
+| Exclusion criteria | Procedure records excluded by dashboard filters or future documented service-line grouping rules. |
+| SQL source objects | `silver.procedure`; `gold.fact_procedure`; `gold.dim_procedure`; `gold.mart_service_utilization`; `gold.dim_date`; `gold.dim_encounter_class`. |
 | Power BI measure name | `Procedure Volume` |
 | Owner | Operational Reporting Owner |
 | Steward | Data Steward |
-| Refresh frequency | To be defined during reporting implementation. |
-| Validation query | Count eligible procedure records from the gold procedure fact or service utilization mart. |
-| Data quality dependencies | Procedure code completeness, patient linkage, encounter linkage, procedure grouping logic. |
-| Known limitations | Procedure grouping logic will determine how useful this KPI is for business interpretation. |
-| Related dashboard page | Conditions & Procedures |
+| Refresh frequency | On gold-layer refresh. |
+| Validation query | Reconcile `SUM(procedure_count)` from `gold.fact_procedure` to `SUM(procedure_volume)` from `gold.mart_service_utilization`. |
+| Data quality dependencies | Procedure patient linkage, procedure encounter linkage, procedure code completeness, procedure datetime validity, procedure grouping logic. |
+| Known limitations | Procedure grouping depends on the derived `procedure_category` field and may be refined for dashboard presentation. |
+| Related dashboard page | Conditions & Procedures; Service Utilization |
 | Related FHIR resources | Procedure; Patient; Encounter |
-| Status | Draft |
+| Status | Defined |
 
-### 6.8 Data Quality Pass Rate
+### 5.8 Data Quality Pass Rate
 
 | Field | Definition |
 |---|---|
 | KPI name | Data Quality Pass Rate |
-| Business question | How reliable are the reporting assets based on defined data quality checks? |
-| Plain-English definition | Percentage of evaluated checks or records that pass defined validation rules. |
-| Formal formula | Passed checks or records divided by total evaluated checks or records. |
-| Grain | Quality rule, data asset, or reporting domain. |
-| Inclusion criteria | Defined quality checks included in the reporting trust framework. |
-| Exclusion criteria | Checks not yet implemented or explicitly marked out of scope. |
-| SQL source objects | Planned governance objects: `governance.quality_rule`, `governance.quality_check_result`; planned mart: `gold.mart_reporting_trust`. |
+| Business question | How reliable are the reporting assets based on defined quality checks? |
+| Plain-English definition | Percentage of quality checks that passed in the selected reporting scope. |
+| Formal formula | `SUM(gold.mart_reporting_trust.passed_check_count) / SUM(gold.mart_reporting_trust.quality_check_count)`. |
+| Grain | Quality rule, target object, quality dimension, severity, or dashboard filter context. |
+| Inclusion criteria | Implemented quality checks represented in `gold.fact_data_quality_issue` and `gold.mart_reporting_trust`. |
+| Exclusion criteria | Quality checks not yet implemented or explicitly out of scope. |
+| SQL source objects | `governance.quality_rule`; `governance.quality_check_result`; `gold.fact_data_quality_issue`; `gold.mart_reporting_trust`. |
 | Power BI measure name | `Data Quality Pass Rate` |
 | Owner | Data Governance Owner |
 | Steward | Data Steward |
-| Refresh frequency | To be defined during validation implementation. |
-| Validation query | Recalculate pass and fail counts from governance quality result tables. |
-| Data quality dependencies | Completeness of quality rule implementation and consistency of severity/status values. |
-| Known limitations | Pass rate depends on rule coverage, rule severity, and whether the metric is calculated by checks or by records. |
+| Refresh frequency | On quality-check run and gold-layer refresh. |
+| Validation query | Reconcile passed and total check counts from `gold.mart_reporting_trust` to `gold.fact_data_quality_issue`. |
+| Data quality dependencies | Completeness of quality-rule implementation, consistency of severity/status values, latest-run tagging, quality result persistence. |
+| Known limitations | This KPI is check-count based by default. Record-level pass rate is available separately as `record_pass_rate` and may tell a different story when one failed rule affects many rows. |
 | Related dashboard page | Executive Overview; Data Quality & Governance |
 | Related FHIR resources | Not applicable |
-| Status | Draft |
+| Status | Defined |
 
-### 6.9 API Resource Coverage
+### 5.9 API Resource Coverage
 
 | Field | Definition |
 |---|---|
@@ -278,35 +247,21 @@ The following KPI entries define the starting structure for ClinicalPulse. Calcu
 | Power BI measure name | `API Resource Coverage` |
 | Owner | Data Platform Owner |
 | Steward | Data Steward |
-| Refresh frequency | To be defined during API implementation. |
-| Validation query | Count selected entities with completed mapping records and API-ready outputs. |
-| Data quality dependencies | Mapping completeness, API view readiness, required identifier availability. |
+| Refresh frequency | On API/FHIR mapping update. |
+| Validation query | Count selected entities with completed mapping records and API-ready outputs once FHIR mapping and API views are implemented. |
+| Data quality dependencies | Mapping completeness, API view readiness, required identifier availability, JSON-ready field availability. |
 | Known limitations | This KPI demonstrates interoperability coverage only and does not imply full FHIR server compliance. |
 | Related dashboard page | FHIR API Demonstration; Data Quality & Governance |
 | Related FHIR resources | Patient; Encounter; Observation; Condition; Procedure; Organization; Practitioner |
-| Status | Draft |
+| Status | Defined |
 
-## 7. Governance Notes
+## 6. Current Implementation Notes
 
-- KPI names should remain stable once used in dashboards.
-- Any change to a KPI definition should be documented before dashboard values are refreshed or presented.
-- KPI definitions should be reviewed before implementation in Power BI.
-- Power BI measures should reconcile to SQL validation queries.
-- Known limitations should remain visible to users and reviewers.
-- Synthetic-data caveats must be preserved where they affect interpretation.
+- Gold-layer encounter, readmission, condition, observation, procedure, data quality issue facts, and reporting marts are now the primary SQL reporting sources for implemented operational KPIs.
+- Power BI measures have not yet been implemented in this document. The listed measure names are governed targets for the Power BI semantic model.
+- API Resource Coverage is defined now but depends on later FHIR mapping, API views, and endpoint work.
+- KPI validation should reconcile Power BI values back to SQL outputs before dashboard screenshots are treated as final.
 
-## 8. Assumptions
+## 7. Synthetic Data Caveat
 
-- ClinicalPulse uses synthetic Synthea data and does not represent real patients or real hospital performance.
-- KPI definitions are initially drafted before all SQL Server and Power BI objects exist.
-- Final formulas, source objects, and validation queries may be refined during implementation.
-- Gold-layer tables, marts, and Power BI measures will become the authoritative reporting layer once implemented.
-- KPI ownership and stewardship roles are modeled for portfolio demonstration and governance clarity.
-
-## 9. Limitations
-
-- This document is a skeleton and does not prove that each KPI has been implemented.
-- Some source object names may be updated as the SQL Server model is built.
-- Some KPIs depend on derived logic that will be finalized later, such as readmission eligibility, encounter class grouping, procedure grouping, and observation categorization.
-- Synthetic EHR data may not support the same operational interpretation as real hospital data.
-- API-related KPI fields describe FHIR-aligned demonstration scope, not certified production FHIR compliance.
+ClinicalPulse uses synthetic Synthea data and does not represent real patients, real hospital performance, or clinical decision-support evidence. KPI outputs demonstrate data modeling, BI logic, governance, and validation practices only.
