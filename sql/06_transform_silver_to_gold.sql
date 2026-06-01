@@ -1091,3 +1091,277 @@ GROUP BY
 
     fe.encounter_datetime_quality_status;
 GO
+
+
+
+/*
+Purpose: Create reporting-ready marts for LOS and 30-day readmission reporting.
+
+Assumptions:
+- mart_length_of_stay is encounter-grain so Power BI can calculate average and median LOS correctly.
+- mart_readmissions is index-encounter-grain so 30-day readmission numerator and denominator aggregate consistently.
+- Readmission logic uses the next encounter for the same patient after index encounter stop time.
+- Planned versus unplanned readmission classification is not available in the current model.
+*/
+
+GO
+
+CREATE OR ALTER VIEW gold.mart_length_of_stay AS
+WITH condition_summary AS (
+    SELECT
+        encounter_fact_key,
+        COUNT(*) AS condition_record_count,
+        COUNT(DISTINCT COALESCE(condition_category, 'Unknown')) AS distinct_condition_category_count,
+        MIN(COALESCE(condition_category, 'Unknown')) AS representative_condition_category
+    FROM gold.fact_condition
+    WHERE encounter_fact_key IS NOT NULL
+    GROUP BY encounter_fact_key
+),
+procedure_summary AS (
+    SELECT
+        encounter_fact_key,
+        COUNT(*) AS procedure_record_count,
+        COUNT(DISTINCT COALESCE(procedure_category, 'Unknown')) AS distinct_procedure_category_count,
+        MIN(COALESCE(procedure_category, 'Unknown')) AS representative_procedure_category
+    FROM gold.fact_procedure
+    WHERE encounter_fact_key IS NOT NULL
+    GROUP BY encounter_fact_key
+)
+SELECT
+    fe.encounter_fact_key,
+    fe.patient_key,
+
+    fe.encounter_start_date_key,
+    dstart.full_date AS encounter_start_date,
+    dstart.calendar_year AS encounter_start_year,
+    dstart.calendar_quarter AS encounter_start_quarter,
+    dstart.calendar_month AS encounter_start_month,
+    dstart.calendar_month_name AS encounter_start_month_name,
+    dstart.week_of_year AS encounter_start_week_of_year,
+
+    fe.encounter_stop_date_key,
+    dstop.full_date AS encounter_stop_date,
+
+    fe.organization_key,
+    dorg.organization_id,
+    COALESCE(dorg.organization_name, dorg.organization_id, 'Unknown Organization') AS organization_display_name,
+
+    fe.provider_key,
+    dprov.provider_id,
+    COALESCE(dprov.provider_name, dprov.provider_id, 'Unknown Provider') AS provider_display_name,
+
+    fe.encounter_class_key,
+    dec.encounter_class,
+    dec.encounter_class_display,
+    dec.encounter_class_group,
+    dec.is_inpatient,
+    dec.is_emergency,
+    dec.is_ambulatory,
+
+    dp.age_band AS patient_age_band,
+    dp.gender AS patient_gender,
+    dp.race AS patient_race,
+    dp.ethnicity AS patient_ethnicity,
+    dp.state AS patient_state,
+    dp.county AS patient_county,
+
+    COALESCE(cs.condition_record_count, 0) AS condition_record_count,
+    COALESCE(cs.distinct_condition_category_count, 0) AS distinct_condition_category_count,
+    COALESCE(cs.representative_condition_category, 'No linked condition') AS representative_condition_category,
+
+    COALESCE(ps.procedure_record_count, 0) AS procedure_record_count,
+    COALESCE(ps.distinct_procedure_category_count, 0) AS distinct_procedure_category_count,
+    COALESCE(ps.representative_procedure_category, 'No linked procedure') AS representative_procedure_category,
+
+    fe.encounter_start_datetime_utc,
+    fe.encounter_stop_datetime_utc,
+    fe.encounter_duration_minutes,
+    fe.encounter_duration_hours,
+    fe.length_of_stay_days,
+
+    fe.encounter_count AS total_encounters,
+    fe.valid_encounter_count AS valid_encounters,
+
+    CASE
+        WHEN fe.valid_encounter_count = 1
+         AND fe.length_of_stay_days IS NOT NULL
+        THEN 1
+        ELSE 0
+    END AS los_eligible_encounter_count,
+
+    CAST(
+        CASE
+            WHEN fe.valid_encounter_count = 1
+             AND fe.length_of_stay_days IS NOT NULL
+            THEN fe.length_of_stay_days
+            ELSE 0
+        END AS DECIMAL(18,4)
+    ) AS los_days_numerator,
+
+    CASE
+        WHEN fe.valid_encounter_count = 1
+         AND fe.length_of_stay_days IS NOT NULL
+         AND fe.length_of_stay_days < 1
+        THEN 1
+        ELSE 0
+    END AS same_day_encounter_count,
+
+    CASE
+        WHEN fe.valid_encounter_count = 1
+         AND fe.length_of_stay_days IS NOT NULL
+         AND fe.length_of_stay_days >= 1
+        THEN 1
+        ELSE 0
+    END AS multi_day_encounter_count,
+
+    CASE
+        WHEN fe.valid_encounter_count = 1
+         AND fe.length_of_stay_days >= 7
+        THEN 1
+        ELSE 0
+    END AS long_stay_encounter_count,
+
+    CASE
+        WHEN fe.valid_encounter_count <> 1 OR fe.length_of_stay_days IS NULL THEN 'Not LOS eligible'
+        WHEN fe.length_of_stay_days < 1 THEN '<1 day'
+        WHEN fe.length_of_stay_days < 3 THEN '1-2 days'
+        WHEN fe.length_of_stay_days < 8 THEN '3-7 days'
+        WHEN fe.length_of_stay_days < 15 THEN '8-14 days'
+        ELSE '15+ days'
+    END AS los_bucket,
+
+    fe.is_missing_start_datetime,
+    fe.is_missing_stop_datetime,
+    fe.is_stop_before_start,
+    fe.encounter_datetime_quality_status,
+
+    fe.gold_load_datetime AS latest_gold_load_datetime
+FROM gold.fact_encounter fe
+LEFT JOIN gold.dim_date dstart
+    ON fe.encounter_start_date_key = dstart.date_key
+LEFT JOIN gold.dim_date dstop
+    ON fe.encounter_stop_date_key = dstop.date_key
+LEFT JOIN gold.dim_patient dp
+    ON fe.patient_key = dp.patient_key
+LEFT JOIN gold.dim_organization dorg
+    ON fe.organization_key = dorg.organization_key
+LEFT JOIN gold.dim_provider dprov
+    ON fe.provider_key = dprov.provider_key
+LEFT JOIN gold.dim_encounter_class dec
+    ON fe.encounter_class_key = dec.encounter_class_key
+LEFT JOIN condition_summary cs
+    ON fe.encounter_fact_key = cs.encounter_fact_key
+LEFT JOIN procedure_summary ps
+    ON fe.encounter_fact_key = ps.encounter_fact_key;
+GO
+
+CREATE OR ALTER VIEW gold.mart_readmissions AS
+WITH condition_summary AS (
+    SELECT
+        encounter_fact_key,
+        COUNT(*) AS index_condition_record_count,
+        COUNT(DISTINCT COALESCE(condition_category, 'Unknown')) AS index_distinct_condition_category_count,
+        MIN(COALESCE(condition_category, 'Unknown')) AS representative_index_condition_category
+    FROM gold.fact_condition
+    WHERE encounter_fact_key IS NOT NULL
+    GROUP BY encounter_fact_key
+)
+SELECT
+    r.readmission_fact_key,
+
+    r.index_encounter_fact_key,
+    r.patient_key,
+
+    r.index_start_date_key,
+    dindex_start.full_date AS index_encounter_start_date,
+    dindex_start.calendar_year AS index_start_year,
+    dindex_start.calendar_quarter AS index_start_quarter,
+    dindex_start.calendar_month AS index_start_month,
+    dindex_start.calendar_month_name AS index_start_month_name,
+
+    r.index_stop_date_key,
+    dindex_stop.full_date AS index_encounter_stop_date,
+
+    r.index_organization_key AS organization_key,
+    dorg.organization_id,
+    COALESCE(dorg.organization_name, dorg.organization_id, 'Unknown Organization') AS organization_display_name,
+
+    r.index_provider_key AS provider_key,
+    dprov.provider_id,
+    COALESCE(dprov.provider_name, dprov.provider_id, 'Unknown Provider') AS provider_display_name,
+
+    r.index_encounter_class_key AS encounter_class_key,
+    dec.encounter_class,
+    dec.encounter_class_display,
+    dec.encounter_class_group,
+    dec.is_inpatient,
+    dec.is_emergency,
+    dec.is_ambulatory,
+
+    dp.age_band AS patient_age_band,
+    dp.gender AS patient_gender,
+    dp.race AS patient_race,
+    dp.ethnicity AS patient_ethnicity,
+    dp.state AS patient_state,
+    dp.county AS patient_county,
+
+    COALESCE(cs.index_condition_record_count, 0) AS index_condition_record_count,
+    COALESCE(cs.index_distinct_condition_category_count, 0) AS index_distinct_condition_category_count,
+    COALESCE(cs.representative_index_condition_category, 'No linked condition') AS representative_index_condition_category,
+
+    r.index_encounter_start_datetime_utc,
+    r.index_encounter_stop_datetime_utc,
+
+    r.readmission_encounter_fact_key,
+    r.readmission_start_date_key,
+    dreadmit_start.full_date AS readmission_start_date,
+    r.readmission_start_datetime_utc,
+
+    readmit_fe.encounter_class AS readmission_encounter_class,
+    readmit_dec.encounter_class_group AS readmission_encounter_class_group,
+
+    r.days_to_readmission,
+    r.hours_to_readmission,
+
+    r.eligible_encounter_count AS readmission_rate_denominator,
+    r.readmission_30_day_count AS readmission_rate_numerator,
+    r.is_30_day_readmission,
+    r.readmission_window_days,
+
+    CASE
+        WHEN r.readmission_encounter_fact_key IS NULL THEN 1
+        ELSE 0
+    END AS no_subsequent_encounter_count,
+
+    CASE
+        WHEN r.readmission_encounter_fact_key IS NOT NULL
+         AND r.is_30_day_readmission = 0
+        THEN 1
+        ELSE 0
+    END AS subsequent_encounter_after_30_days_count,
+
+    r.readmission_logic_status,
+
+    r.gold_load_datetime AS latest_gold_load_datetime
+FROM gold.fact_readmission r
+LEFT JOIN gold.dim_date dindex_start
+    ON r.index_start_date_key = dindex_start.date_key
+LEFT JOIN gold.dim_date dindex_stop
+    ON r.index_stop_date_key = dindex_stop.date_key
+LEFT JOIN gold.dim_date dreadmit_start
+    ON r.readmission_start_date_key = dreadmit_start.date_key
+LEFT JOIN gold.dim_patient dp
+    ON r.patient_key = dp.patient_key
+LEFT JOIN gold.dim_organization dorg
+    ON r.index_organization_key = dorg.organization_key
+LEFT JOIN gold.dim_provider dprov
+    ON r.index_provider_key = dprov.provider_key
+LEFT JOIN gold.dim_encounter_class dec
+    ON r.index_encounter_class_key = dec.encounter_class_key
+LEFT JOIN gold.fact_encounter readmit_fe
+    ON r.readmission_encounter_fact_key = readmit_fe.encounter_fact_key
+LEFT JOIN gold.dim_encounter_class readmit_dec
+    ON readmit_fe.encounter_class_key = readmit_dec.encounter_class_key
+LEFT JOIN condition_summary cs
+    ON r.index_encounter_fact_key = cs.encounter_fact_key;
+GO
