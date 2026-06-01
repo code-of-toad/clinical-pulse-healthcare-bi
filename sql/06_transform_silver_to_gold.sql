@@ -18,6 +18,8 @@ SET DATEFIRST 7;
 
 DECLARE @gold_load_datetime DATETIME2 = SYSUTCDATETIME();
 
+TRUNCATE TABLE gold.fact_readmission;
+TRUNCATE TABLE gold.fact_encounter;
 TRUNCATE TABLE [gold].[dim_patient];
 TRUNCATE TABLE [gold].[dim_date];
 TRUNCATE TABLE [gold].[dim_organization];
@@ -354,4 +356,191 @@ SELECT
     procedure_category,
     @gold_load_datetime
 FROM procedure_keys;
+GO
+
+DECLARE @gold_load_datetime DATETIME2 = SYSUTCDATETIME();
+
+INSERT INTO gold.fact_encounter (
+    encounter_id,
+    patient_key,
+    encounter_start_date_key,
+    encounter_stop_date_key,
+    organization_key,
+    provider_key,
+    encounter_class_key,
+    patient_id,
+    organization_id,
+    provider_id,
+    payer_id,
+    encounter_start_datetime_utc,
+    encounter_stop_datetime_utc,
+    encounter_duration_minutes,
+    encounter_duration_hours,
+    length_of_stay_days,
+    encounter_class,
+    encounter_code,
+    encounter_description,
+    base_encounter_cost,
+    total_claim_cost,
+    payer_coverage,
+    reason_code,
+    reason_description,
+    encounter_count,
+    valid_encounter_count,
+    is_missing_start_datetime,
+    is_missing_stop_datetime,
+    is_invalid_start_datetime,
+    is_invalid_stop_datetime,
+    is_stop_before_start,
+    encounter_datetime_quality_status,
+    source_system,
+    source_entity,
+    bronze_ingestion_batch_id,
+    bronze_source_file,
+    silver_load_datetime,
+    gold_load_datetime
+)
+SELECT
+    e.encounter_id,
+    dp.patient_key,
+    d_start.date_key,
+    d_stop.date_key,
+    do.organization_key,
+    dpr.provider_key,
+    dec.encounter_class_key,
+    e.patient_id,
+    COALESCE(e.organization_id, 'UNKNOWN') AS organization_id,
+    COALESCE(e.provider_id, 'UNKNOWN') AS provider_id,
+    e.payer_id,
+    e.encounter_start_datetime_utc,
+    e.encounter_stop_datetime_utc,
+    e.encounter_duration_minutes,
+    e.encounter_duration_hours,
+    e.length_of_stay_days,
+    COALESCE(e.encounter_class, 'unknown') AS encounter_class,
+    e.encounter_code,
+    e.encounter_description,
+    e.base_encounter_cost,
+    e.total_claim_cost,
+    e.payer_coverage,
+    e.reason_code,
+    e.reason_description,
+    1 AS encounter_count,
+    CASE
+        WHEN e.encounter_datetime_quality_status = 'valid' THEN 1
+        ELSE 0
+    END AS valid_encounter_count,
+    e.is_missing_start_datetime,
+    e.is_missing_stop_datetime,
+    e.is_invalid_start_datetime,
+    e.is_invalid_stop_datetime,
+    e.is_stop_before_start,
+    e.encounter_datetime_quality_status,
+    e.source_system,
+    e.source_entity,
+    e.bronze_ingestion_batch_id,
+    e.bronze_source_file,
+    e.silver_load_datetime,
+    @gold_load_datetime
+FROM silver.encounter e
+LEFT JOIN gold.dim_patient dp
+    ON e.patient_id = dp.patient_id
+LEFT JOIN gold.dim_date d_start
+    ON e.encounter_start_date = d_start.full_date
+LEFT JOIN gold.dim_date d_stop
+    ON e.encounter_stop_date = d_stop.full_date
+LEFT JOIN gold.dim_organization do
+    ON COALESCE(e.organization_id, 'UNKNOWN') = do.organization_id
+LEFT JOIN gold.dim_provider dpr
+    ON COALESCE(e.provider_id, 'UNKNOWN') = dpr.provider_id
+LEFT JOIN gold.dim_encounter_class dec
+    ON COALESCE(e.encounter_class, 'unknown') = dec.encounter_class;
+GO
+
+DECLARE @gold_load_datetime DATETIME2 = SYSUTCDATETIME();
+
+INSERT INTO gold.fact_readmission (
+    index_encounter_fact_key,
+    index_encounter_id,
+    patient_key,
+    patient_id,
+    index_encounter_start_datetime_utc,
+    index_encounter_stop_datetime_utc,
+    index_start_date_key,
+    index_stop_date_key,
+    index_organization_key,
+    index_provider_key,
+    index_encounter_class_key,
+    readmission_encounter_fact_key,
+    readmission_encounter_id,
+    readmission_start_datetime_utc,
+    readmission_start_date_key,
+    days_to_readmission,
+    hours_to_readmission,
+    eligible_encounter_count,
+    readmission_30_day_count,
+    is_30_day_readmission,
+    readmission_window_days,
+    readmission_logic_status,
+    gold_load_datetime
+)
+SELECT
+    index_encounter.encounter_fact_key AS index_encounter_fact_key,
+    index_encounter.encounter_id AS index_encounter_id,
+    index_encounter.patient_key,
+    index_encounter.patient_id,
+    index_encounter.encounter_start_datetime_utc AS index_encounter_start_datetime_utc,
+    index_encounter.encounter_stop_datetime_utc AS index_encounter_stop_datetime_utc,
+    index_encounter.encounter_start_date_key AS index_start_date_key,
+    index_encounter.encounter_stop_date_key AS index_stop_date_key,
+    index_encounter.organization_key AS index_organization_key,
+    index_encounter.provider_key AS index_provider_key,
+    index_encounter.encounter_class_key AS index_encounter_class_key,
+    next_encounter.encounter_fact_key AS readmission_encounter_fact_key,
+    next_encounter.encounter_id AS readmission_encounter_id,
+    next_encounter.encounter_start_datetime_utc AS readmission_start_datetime_utc,
+    next_encounter.encounter_start_date_key AS readmission_start_date_key,
+    CASE
+        WHEN next_encounter.encounter_id IS NULL THEN NULL
+        ELSE DATEDIFF(DAY, index_encounter.encounter_stop_datetime_utc, next_encounter.encounter_start_datetime_utc)
+    END AS days_to_readmission,
+    CASE
+        WHEN next_encounter.encounter_id IS NULL THEN NULL
+        ELSE CAST(DATEDIFF_BIG(MINUTE, index_encounter.encounter_stop_datetime_utc, next_encounter.encounter_start_datetime_utc) / 60.0 AS DECIMAL(18,2))
+    END AS hours_to_readmission,
+    1 AS eligible_encounter_count,
+    CASE
+        WHEN next_encounter.encounter_start_datetime_utc <= DATEADD(DAY, 30, index_encounter.encounter_stop_datetime_utc) THEN 1
+        ELSE 0
+    END AS readmission_30_day_count,
+    CASE
+        WHEN next_encounter.encounter_start_datetime_utc <= DATEADD(DAY, 30, index_encounter.encounter_stop_datetime_utc) THEN 1
+        ELSE 0
+    END AS is_30_day_readmission,
+    30 AS readmission_window_days,
+    CASE
+        WHEN next_encounter.encounter_id IS NULL THEN 'no_subsequent_encounter'
+        WHEN next_encounter.encounter_start_datetime_utc <= DATEADD(DAY, 30, index_encounter.encounter_stop_datetime_utc) THEN 'readmitted_within_30_days'
+        ELSE 'subsequent_encounter_after_30_days'
+    END AS readmission_logic_status,
+    @gold_load_datetime
+FROM gold.fact_encounter index_encounter
+OUTER APPLY (
+    SELECT TOP (1)
+        candidate.encounter_fact_key,
+        candidate.encounter_id,
+        candidate.encounter_start_datetime_utc,
+        candidate.encounter_start_date_key
+    FROM gold.fact_encounter candidate
+    WHERE candidate.patient_id = index_encounter.patient_id
+      AND candidate.encounter_start_datetime_utc > index_encounter.encounter_stop_datetime_utc
+      AND candidate.encounter_id <> index_encounter.encounter_id
+    ORDER BY
+        candidate.encounter_start_datetime_utc,
+        candidate.encounter_id
+) next_encounter
+WHERE index_encounter.patient_id IS NOT NULL
+  AND index_encounter.encounter_start_datetime_utc IS NOT NULL
+  AND index_encounter.encounter_stop_datetime_utc IS NOT NULL
+  AND index_encounter.encounter_stop_datetime_utc >= index_encounter.encounter_start_datetime_utc;
 GO

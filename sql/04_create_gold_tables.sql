@@ -22,6 +22,10 @@ BEGIN
 END;
 GO
 
+DROP TABLE IF EXISTS gold.fact_readmission;
+DROP TABLE IF EXISTS gold.fact_encounter;
+GO
+
 DROP TABLE IF EXISTS [gold].[dim_procedure];
 DROP TABLE IF EXISTS [gold].[dim_observation];
 DROP TABLE IF EXISTS [gold].[dim_condition];
@@ -159,5 +163,95 @@ CREATE TABLE [gold].[dim_procedure] (
     gold_load_datetime DATETIME2 NOT NULL CONSTRAINT [df_dim_procedure_gold_load_datetime] DEFAULT SYSUTCDATETIME(),
 
     CONSTRAINT [uq_dim_procedure_natural_key_hash] UNIQUE (procedure_natural_key_hash)
+);
+GO
+
+CREATE TABLE gold.fact_encounter (
+    encounter_fact_key INT IDENTITY(1,1) NOT NULL CONSTRAINT pk_fact_encounter PRIMARY KEY,
+
+    encounter_id NVARCHAR(100) NOT NULL,
+
+    patient_key INT NULL,
+    encounter_start_date_key INT NULL,
+    encounter_stop_date_key INT NULL,
+    organization_key INT NULL,
+    provider_key INT NULL,
+    encounter_class_key INT NULL,
+
+    patient_id NVARCHAR(100) NULL,
+    organization_id NVARCHAR(100) NULL,
+    provider_id NVARCHAR(100) NULL,
+    payer_id NVARCHAR(100) NULL,
+
+    encounter_start_datetime_utc DATETIME2 NULL,
+    encounter_stop_datetime_utc DATETIME2 NULL,
+    encounter_duration_minutes BIGINT NULL,
+    encounter_duration_hours DECIMAL(18,2) NULL,
+    length_of_stay_days DECIMAL(18,4) NULL,
+
+    encounter_class NVARCHAR(100) NULL,
+    encounter_code NVARCHAR(100) NULL,
+    encounter_description NVARCHAR(255) NULL,
+
+    base_encounter_cost DECIMAL(18,2) NULL,
+    total_claim_cost DECIMAL(18,2) NULL,
+    payer_coverage DECIMAL(18,2) NULL,
+
+    reason_code NVARCHAR(100) NULL,
+    reason_description NVARCHAR(255) NULL,
+
+    encounter_count INT NOT NULL,
+    valid_encounter_count INT NOT NULL,
+
+    is_missing_start_datetime BIT NOT NULL,
+    is_missing_stop_datetime BIT NOT NULL,
+    is_invalid_start_datetime BIT NOT NULL,
+    is_invalid_stop_datetime BIT NOT NULL,
+    is_stop_before_start BIT NOT NULL,
+    encounter_datetime_quality_status NVARCHAR(50) NOT NULL,
+
+    source_system NVARCHAR(100) NOT NULL,
+    source_entity NVARCHAR(100) NOT NULL,
+    bronze_ingestion_batch_id BIGINT NULL,
+    bronze_source_file NVARCHAR(255) NULL,
+    silver_load_datetime DATETIME2 NOT NULL,
+    gold_load_datetime DATETIME2 NOT NULL CONSTRAINT df_fact_encounter_gold_load_datetime DEFAULT SYSUTCDATETIME(),
+
+    CONSTRAINT uq_fact_encounter_encounter_id UNIQUE (encounter_id)
+);
+GO
+
+CREATE TABLE gold.fact_readmission (
+    readmission_fact_key INT IDENTITY(1,1) NOT NULL CONSTRAINT pk_fact_readmission PRIMARY KEY,
+
+    index_encounter_fact_key INT NOT NULL,
+    index_encounter_id NVARCHAR(100) NOT NULL,
+
+    patient_key INT NULL,
+    patient_id NVARCHAR(100) NULL,
+
+    index_encounter_start_datetime_utc DATETIME2 NULL,
+    index_encounter_stop_datetime_utc DATETIME2 NULL,
+    index_start_date_key INT NULL,
+    index_stop_date_key INT NULL,
+    index_organization_key INT NULL,
+    index_provider_key INT NULL,
+    index_encounter_class_key INT NULL,
+
+    readmission_encounter_fact_key INT NULL,
+    readmission_encounter_id NVARCHAR(100) NULL,
+    readmission_start_datetime_utc DATETIME2 NULL,
+    readmission_start_date_key INT NULL,
+
+    days_to_readmission INT NULL,
+    hours_to_readmission DECIMAL(18,2) NULL,
+
+    eligible_encounter_count INT NOT NULL,
+    readmission_30_day_count INT NOT NULL,
+    is_30_day_readmission BIT NOT NULL,
+    readmission_window_days INT NOT NULL,
+    readmission_logic_status NVARCHAR(100) NOT NULL,
+
+    gold_load_datetime DATETIME2 NOT NULL CONSTRAINT df_fact_readmission_gold_load_datetime DEFAULT SYSUTCDATETIME()
 );
 GO
