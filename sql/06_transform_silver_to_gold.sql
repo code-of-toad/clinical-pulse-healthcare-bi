@@ -1365,3 +1365,260 @@ LEFT JOIN gold.dim_encounter_class readmit_dec
 LEFT JOIN condition_summary cs
     ON r.index_encounter_fact_key = cs.encounter_fact_key;
 GO
+
+
+
+/*
+Purpose: Create reporting-ready marts for observation/lab activity and procedure/service utilization.
+
+Assumptions:
+- mart_lab_operations uses all current observation records, because Synthea observations include both lab-like
+  and vital-sign-like records. Strict lab-only classification can be refined later if needed.
+- mart_service_utilization uses procedure records as the service-utilization grain.
+- Both marts are implemented as gold-layer views because they summarize existing gold facts and dimensions.
+*/
+
+GO
+
+CREATE OR ALTER VIEW gold.mart_lab_operations AS
+SELECT
+    fo.observation_date_key,
+    dd.full_date AS observation_date,
+    dd.calendar_year,
+    dd.calendar_quarter,
+    dd.calendar_month,
+    dd.calendar_month_name,
+    dd.week_of_year,
+    dd.day_of_week,
+    dd.day_name,
+    dd.is_weekend,
+
+    fo.organization_key,
+    dorg.organization_id,
+    COALESCE(dorg.organization_name, dorg.organization_id, 'Unknown Organization') AS organization_display_name,
+
+    fo.provider_key,
+    dprov.provider_id,
+    COALESCE(dprov.provider_name, dprov.provider_id, 'Unknown Provider') AS provider_display_name,
+
+    fo.encounter_class_key,
+    dec.encounter_class,
+    dec.encounter_class_display,
+    dec.encounter_class_group,
+    dec.is_inpatient,
+    dec.is_emergency,
+    dec.is_ambulatory,
+
+    dp.age_band AS patient_age_band,
+    dp.gender AS patient_gender,
+    dp.race AS patient_race,
+    dp.ethnicity AS patient_ethnicity,
+    dp.state AS patient_state,
+    dp.county AS patient_county,
+
+    fo.observation_key,
+    dob.observation_category,
+    dob.observation_code,
+    dob.observation_description,
+    dob.observation_units,
+    dob.observation_type,
+
+    fo.observation_quality_status,
+
+    SUM(fo.observation_count) AS observation_volume,
+    SUM(fo.numeric_observation_count) AS numeric_observation_count,
+    SUM(fo.encounter_linked_observation_count) AS encounter_linked_observation_count,
+    SUM(fo.patient_level_observation_count) AS patient_level_observation_count,
+
+    COUNT(DISTINCT fo.patient_key) AS unique_patients_in_group,
+    COUNT(DISTINCT fo.encounter_fact_key) AS unique_encounters_in_group,
+
+    CAST(AVG(CASE WHEN fo.observation_value_numeric IS NOT NULL THEN fo.observation_value_numeric END) AS DECIMAL(18,4)) AS average_numeric_observation_value,
+    MIN(fo.observation_value_numeric) AS minimum_numeric_observation_value,
+    MAX(fo.observation_value_numeric) AS maximum_numeric_observation_value,
+
+    SUM(CASE WHEN fo.is_missing_observation_datetime = 1 THEN 1 ELSE 0 END) AS missing_observation_datetime_count,
+    SUM(CASE WHEN fo.is_invalid_observation_datetime = 1 THEN 1 ELSE 0 END) AS invalid_observation_datetime_count,
+    SUM(CASE WHEN fo.is_missing_patient_id = 1 THEN 1 ELSE 0 END) AS missing_patient_id_count,
+    SUM(CASE WHEN fo.is_missing_observation_code = 1 THEN 1 ELSE 0 END) AS missing_observation_code_count,
+
+    MAX(fo.gold_load_datetime) AS latest_gold_load_datetime
+FROM gold.fact_observation fo
+LEFT JOIN gold.dim_date dd
+    ON fo.observation_date_key = dd.date_key
+LEFT JOIN gold.dim_patient dp
+    ON fo.patient_key = dp.patient_key
+LEFT JOIN gold.dim_organization dorg
+    ON fo.organization_key = dorg.organization_key
+LEFT JOIN gold.dim_provider dprov
+    ON fo.provider_key = dprov.provider_key
+LEFT JOIN gold.dim_encounter_class dec
+    ON fo.encounter_class_key = dec.encounter_class_key
+LEFT JOIN gold.dim_observation dob
+    ON fo.observation_key = dob.observation_key
+GROUP BY
+    fo.observation_date_key,
+    dd.full_date,
+    dd.calendar_year,
+    dd.calendar_quarter,
+    dd.calendar_month,
+    dd.calendar_month_name,
+    dd.week_of_year,
+    dd.day_of_week,
+    dd.day_name,
+    dd.is_weekend,
+
+    fo.organization_key,
+    dorg.organization_id,
+    COALESCE(dorg.organization_name, dorg.organization_id, 'Unknown Organization'),
+
+    fo.provider_key,
+    dprov.provider_id,
+    COALESCE(dprov.provider_name, dprov.provider_id, 'Unknown Provider'),
+
+    fo.encounter_class_key,
+    dec.encounter_class,
+    dec.encounter_class_display,
+    dec.encounter_class_group,
+    dec.is_inpatient,
+    dec.is_emergency,
+    dec.is_ambulatory,
+
+    dp.age_band,
+    dp.gender,
+    dp.race,
+    dp.ethnicity,
+    dp.state,
+    dp.county,
+
+    fo.observation_key,
+    dob.observation_category,
+    dob.observation_code,
+    dob.observation_description,
+    dob.observation_units,
+    dob.observation_type,
+
+    fo.observation_quality_status;
+GO
+
+CREATE OR ALTER VIEW gold.mart_service_utilization AS
+SELECT
+    fp.procedure_start_date_key,
+    dd.full_date AS procedure_start_date,
+    dd.calendar_year,
+    dd.calendar_quarter,
+    dd.calendar_month,
+    dd.calendar_month_name,
+    dd.week_of_year,
+    dd.day_of_week,
+    dd.day_name,
+    dd.is_weekend,
+
+    fp.organization_key,
+    dorg.organization_id,
+    COALESCE(dorg.organization_name, dorg.organization_id, 'Unknown Organization') AS organization_display_name,
+
+    fp.provider_key,
+    dprov.provider_id,
+    COALESCE(dprov.provider_name, dprov.provider_id, 'Unknown Provider') AS provider_display_name,
+
+    fp.encounter_class_key,
+    dec.encounter_class,
+    dec.encounter_class_display,
+    dec.encounter_class_group,
+    dec.is_inpatient,
+    dec.is_emergency,
+    dec.is_ambulatory,
+
+    dp.age_band AS patient_age_band,
+    dp.gender AS patient_gender,
+    dp.race AS patient_race,
+    dp.ethnicity AS patient_ethnicity,
+    dp.state AS patient_state,
+    dp.county AS patient_county,
+
+    fp.procedure_key,
+    dproc.procedure_system,
+    dproc.procedure_code,
+    dproc.procedure_description,
+    dproc.procedure_category,
+
+    fp.procedure_datetime_quality_status,
+
+    SUM(fp.procedure_count) AS procedure_volume,
+    SUM(fp.valid_procedure_count) AS valid_procedure_count,
+
+    COUNT(DISTINCT fp.patient_key) AS unique_patients_in_group,
+    COUNT(DISTINCT fp.encounter_fact_key) AS unique_encounters_in_group,
+
+    SUM(COALESCE(fp.procedure_duration_minutes, 0)) AS total_procedure_duration_minutes,
+    CAST(SUM(COALESCE(fp.procedure_duration_hours, 0)) AS DECIMAL(18,2)) AS total_procedure_duration_hours,
+    CAST(AVG(CASE WHEN fp.procedure_duration_hours IS NOT NULL THEN fp.procedure_duration_hours END) AS DECIMAL(18,2)) AS average_procedure_duration_hours,
+
+    CAST(SUM(COALESCE(fp.base_procedure_cost, 0)) AS DECIMAL(18,2)) AS total_base_procedure_cost,
+    CAST(AVG(CASE WHEN fp.base_procedure_cost IS NOT NULL THEN fp.base_procedure_cost END) AS DECIMAL(18,2)) AS average_base_procedure_cost,
+
+    SUM(CASE WHEN fp.is_missing_start_datetime = 1 THEN 1 ELSE 0 END) AS missing_start_datetime_count,
+    SUM(CASE WHEN fp.is_missing_stop_datetime = 1 THEN 1 ELSE 0 END) AS missing_stop_datetime_count,
+    SUM(CASE WHEN fp.is_invalid_start_datetime = 1 THEN 1 ELSE 0 END) AS invalid_start_datetime_count,
+    SUM(CASE WHEN fp.is_invalid_stop_datetime = 1 THEN 1 ELSE 0 END) AS invalid_stop_datetime_count,
+    SUM(CASE WHEN fp.is_stop_before_start = 1 THEN 1 ELSE 0 END) AS stop_before_start_count,
+
+    MAX(fp.gold_load_datetime) AS latest_gold_load_datetime
+FROM gold.fact_procedure fp
+LEFT JOIN gold.dim_date dd
+    ON fp.procedure_start_date_key = dd.date_key
+LEFT JOIN gold.dim_patient dp
+    ON fp.patient_key = dp.patient_key
+LEFT JOIN gold.dim_organization dorg
+    ON fp.organization_key = dorg.organization_key
+LEFT JOIN gold.dim_provider dprov
+    ON fp.provider_key = dprov.provider_key
+LEFT JOIN gold.dim_encounter_class dec
+    ON fp.encounter_class_key = dec.encounter_class_key
+LEFT JOIN gold.dim_procedure dproc
+    ON fp.procedure_key = dproc.procedure_key
+GROUP BY
+    fp.procedure_start_date_key,
+    dd.full_date,
+    dd.calendar_year,
+    dd.calendar_quarter,
+    dd.calendar_month,
+    dd.calendar_month_name,
+    dd.week_of_year,
+    dd.day_of_week,
+    dd.day_name,
+    dd.is_weekend,
+
+    fp.organization_key,
+    dorg.organization_id,
+    COALESCE(dorg.organization_name, dorg.organization_id, 'Unknown Organization'),
+
+    fp.provider_key,
+    dprov.provider_id,
+    COALESCE(dprov.provider_name, dprov.provider_id, 'Unknown Provider'),
+
+    fp.encounter_class_key,
+    dec.encounter_class,
+    dec.encounter_class_display,
+    dec.encounter_class_group,
+    dec.is_inpatient,
+    dec.is_emergency,
+    dec.is_ambulatory,
+
+    dp.age_band,
+    dp.gender,
+    dp.race,
+    dp.ethnicity,
+    dp.state,
+    dp.county,
+
+    fp.procedure_key,
+    dproc.procedure_system,
+    dproc.procedure_code,
+    dproc.procedure_description,
+    dproc.procedure_category,
+
+    fp.procedure_datetime_quality_status;
+GO
+
