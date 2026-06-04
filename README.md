@@ -48,21 +48,26 @@ ClinicalPulse has reached the point where the SQL Server analytical foundation i
 
 ## Architecture
 
-```mermaid
-flowchart LR
-    A[Synthea Synthetic EHR CSVs] --> B[SQL Server Bronze Layer]
-    B --> C[SQL Server Silver Layer]
-    C --> D[SQL Server Gold Layer]
-    D --> E[Power BI Semantic Model]
-    E --> F[Operational Dashboards]
+```text
+Synthea synthetic EHR CSVs
+        |
+        v
+SQL Server bronze layer
+        |
+        v
+SQL Server silver layer  --->  Data quality checks  --->  Governance tables
+        |
+        v
+SQL Server gold layer    --->  KPI validation queries --->  Governance tables
+        |
+        v
+Power BI semantic model
+        |
+        v
+Operational dashboards
 
-    C --> G[Data Quality Checks]
-    D --> H[KPI Validation Queries]
-    G --> I[Governance Tables]
-    H --> I
-
-    D --> J[FHIR-Aligned API Views]
-    J --> K[FastAPI Endpoints - Planned]
+Planned interoperability path:
+SQL Server gold layer ---> FHIR-aligned API views ---> FastAPI endpoints
 ```
 
 ### Layering approach
