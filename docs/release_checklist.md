@@ -1,520 +1,370 @@
-# ClinicalPulse Repository Release Checklist
+# ClinicalPulse Final Release and Evidence Checklist
 
-## 1. Purpose
+## 1. Release Identification
 
-This checklist is used to clean and review the ClinicalPulse repository before the final public release.
-
-It verifies that:
-
-- the repository structure matches the implemented ClinicalPulse scope
-- required code, documentation, and Power BI evidence are present
-- abandoned FHIR/API and optional pipeline-hardening artifacts do not imply completed functionality
-- raw data, embedded Power BI files, backups, credentials, and temporary files are not tracked
-- public documentation is internally consistent and portfolio-safe
-- the release can be traced to Azure DevOps and Git
-
-ClinicalPulse uses synthetic Synthea data. It does not contain real patient data, represent real hospital performance, provide clinical evidence, or support clinical decision-making.
-
-## 2. How to Use This Checklist
-
-Complete this review from the repository root before the final release commit and tag.
-
-Use these status values:
-
-| Status | Meaning |
+| Field | Value |
 |---|---|
-| `[ ]` | Not yet reviewed |
-| `[x]` | Reviewed and passed |
-| `N/A` | Not applicable, with a short explanation |
+| Project | ClinicalPulse — Governed Hospital BI Platform |
+| Release | `v1.0.0` |
+| Release type | Final portfolio release |
+| Azure Boards user story | AB#1705 |
+| Draft/build task | AB#1706 |
+| Review/document task | AB#1707 |
+| Author | Danny Han |
+| Release status | Pending final commit and tag |
 
-Do not mark an item complete solely because a file is listed in documentation. Confirm the actual tracked repository state.
+## 2. Final Release Scope
 
-## 3. Final Implemented Scope
+ClinicalPulse `v1.0.0` includes:
 
-The final ClinicalPulse release includes:
-
-- Synthea synthetic CSV source-data documentation
-- Python-assisted SQL Server ingestion and reconciliation
+- synthetic Synthea healthcare source data documentation
+- Python-assisted CSV ingestion and row-count reconciliation
 - SQL Server bronze, silver, gold, governance, and audit layers
-- data quality rules and persisted quality results
-- governed KPI definitions and lineage
-- Power BI semantic-model documentation
-- seven Power BI dashboard pages represented through aggregate screenshots
-- public portfolio safety, adoption, user guidance, change control, and final walkthrough documentation
+- reporting-ready dimensions, facts, and marts
+- governed KPI definitions and SQL validation queries
+- data quality rules and persisted reporting-trust results
+- Power BI semantic-model documentation and DAX measures
+- seven stakeholder-facing dashboard pages
+- architecture, lineage, catalog, scorecards, security, adoption, user guidance, change control, and portfolio documentation
 - Git, GitHub, and Azure DevOps delivery evidence
 
-The final release excludes:
+ClinicalPulse `v1.0.0` does **not** include:
 
-- FHIR API implementation
-- FastAPI services and API endpoints
+- a FHIR API or FastAPI service
 - API-facing SQL views presented as completed
-- FHIR dashboard pages or API screenshots
-- optional CI/CD pipeline hardening
+- optional pipeline hardening or Azure Pipeline implementation
 - production Power BI Service deployment
-- real hospital or patient data
+- real patient or hospital data
 - clinical-decision support
-- regulatory or security certification
+- regulatory, privacy, or security certification
 
-## 4. Expected High-Level Repository Structure
+## 3. Release Evidence Matrix
 
-The final repository should follow this high-level structure:
+### 3.1 Project narrative and architecture
 
-```text
-clinical-pulse-healthcare-bi/
-|-- README.md
-|-- .gitignore
-|-- docs/
-|   |-- architecture_diagram.png
-|   |-- project_charter.md
-|   |-- business_requirements.md
-|   |-- stakeholder_matrix.md
-|   |-- kpi_dictionary.md
-|   |-- data_governance_plan.md
-|   |-- data_asset_catalog.md
-|   |-- data_asset_scorecards.md
-|   |-- data_lineage.md
-|   |-- security_model.md
-|   |-- adoption_plan.md
-|   |-- dashboard_user_guide.md
-|   |-- change_control.md
-|   |-- final_walkthrough.md
-|   |-- release_checklist.md
-|   `-- supporting implementation and dashboard documentation
-|-- sql/
-|   |-- database and schema creation
-|   |-- bronze, silver, and gold table definitions
-|   |-- bronze-to-silver and silver-to-gold transformations
-|   |-- data quality checks
-|   `-- KPI validation queries
-|-- src/
-|   |-- ingestion utilities
-|   |-- reconciliation and quality-check utilities
-|   `-- retained implementation-support files
-|-- powerbi/
-|   |-- screenshots/
-|   |-- measure_definitions.md
-|   `-- semantic_model_notes.md
-|-- azure-devops/
-|   `-- backlog and delivery-planning artifacts
-`-- data/
-    |-- raw/          local and ignored
-    |-- interim/      local and ignored
-    |-- processed/    local and ignored
-    `-- samples/      public only when intentionally curated
-```
+| Evidence | Repository path | Status |
+|---|---|---|
+| Final project narrative | `README.md` | [ ] |
+| Final architecture diagram | `docs/architecture_diagram.png` | [ ] |
+| Architecture overview | `docs/architecture_overview.md` | [ ] |
+| Final project walkthrough | `docs/final_walkthrough.md` | [ ] |
 
-Git does not track empty folders. Local data directories may therefore exist without appearing on GitHub.
+### 3.2 Business and governance documentation
 
-## 5. Repository Structure Review
+| Evidence | Repository path | Status |
+|---|---|---|
+| Project charter | `docs/project_charter.md` | [ ] |
+| Business requirements | `docs/business_requirements.md` | [ ] |
+| Stakeholder matrix | `docs/stakeholder_matrix.md` | [ ] |
+| KPI dictionary | `docs/kpi_dictionary.md` | [ ] |
+| Data governance plan | `docs/data_governance_plan.md` | [ ] |
+| Data asset catalog | `docs/data_asset_catalog.md` | [ ] |
+| Data asset scorecards | `docs/data_asset_scorecards.md` | [ ] |
+| Data lineage | `docs/data_lineage.md` | [ ] |
+| Security model | `docs/security_model.md` | [ ] |
+| Adoption plan | `docs/adoption_plan.md` | [ ] |
+| Feedback and change control | `docs/change_control.md` | [ ] |
 
-- [ ] `README.md` exists at the repository root.
-- [ ] `.gitignore` exists at the repository root.
-- [ ] `docs/` contains the current governance, portfolio, dashboard, and release documentation.
-- [ ] `docs/architecture_diagram.png` exists and is referenced correctly from `README.md`.
-- [ ] `docs/release_checklist.md` exists.
-- [ ] `sql/` contains the implemented SQL Server build, transformation, quality, and KPI scripts.
-- [ ] `src/` contains only purposeful implementation-support files.
-- [ ] `powerbi/measure_definitions.md` exists.
-- [ ] `powerbi/semantic_model_notes.md` exists.
-- [ ] `powerbi/screenshots/` contains the reviewed dashboard screenshot set.
-- [ ] `azure-devops/` contains only useful planning or delivery evidence.
-- [ ] No duplicate root-level copies of files already stored under `docs/`, `powerbi/`, `sql/`, or `src/` remain.
-- [ ] No temporary folders such as `tmp/`, `temp/`, `output/`, `exports/`, or unmanaged `archive/` folders remain unless they have a documented purpose.
-- [ ] File and folder names use consistent casing and naming conventions.
-- [ ] No file is retained solely because it was generated during drafting.
+### 3.3 SQL Server implementation
 
-### Recommended inspection commands
+| Evidence | Repository path | Status |
+|---|---|---|
+| Database creation | `sql/00_create_database.sql` | [ ] |
+| Schema creation | `sql/01_create_schemas.sql` | [ ] |
+| Bronze tables | `sql/02_create_bronze_tables.sql` | [ ] |
+| Silver tables | `sql/03_create_silver_tables.sql` | [ ] |
+| Gold tables and marts | `sql/04_create_gold_tables.sql` | [ ] |
+| Bronze-to-silver transformation | `sql/05_transform_bronze_to_silver.sql` | [ ] |
+| Silver-to-gold transformation | `sql/06_transform_silver_to_gold.sql` | [ ] |
+| Data quality checks | `sql/07_data_quality_checks.sql` | [ ] |
+| KPI validation queries | `sql/08_kpi_validation_queries.sql` | [ ] |
+| Audit structures | `sql/audit_tables.sql` | [ ] |
 
-```powershell
-tree /F /A
-git ls-files | Sort-Object
-git status --short
-```
+### 3.4 Python implementation
 
-Review the output manually against the expected high-level structure.
+| Evidence | Repository path | Status |
+|---|---|---|
+| Database configuration support | `src/db_config.py` | [ ] |
+| Synthea CSV ingestion | `src/ingest_synthea_csv_to_sqlserver.py` | [ ] |
+| Row-count reconciliation | `src/row_count_reconciliation.py` | [ ] |
+| Quality-check execution | `src/run_quality_checks.py` | [ ] |
+| Configuration guidance | `src/config.md` | [ ] |
 
-## 6. Required Final Documentation
+Historical validation scripts may remain as implementation evidence, but no new generated validation script is required for this release.
 
-Confirm the following final-stage artifacts exist and are current:
+### 3.5 Power BI implementation and evidence
 
-- [ ] `README.md`
-- [ ] `docs/architecture_diagram.png`
-- [ ] `docs/security_model.md`
-- [ ] `docs/adoption_plan.md`
-- [ ] `docs/dashboard_user_guide.md`
-- [ ] `docs/change_control.md`
-- [ ] `docs/final_walkthrough.md`
-- [ ] `docs/release_checklist.md`
+| Evidence | Repository path | Status |
+|---|---|---|
+| Measure definitions | `powerbi/measure_definitions.md` | [ ] |
+| Semantic-model notes | `powerbi/semantic_model_notes.md` | [ ] |
+| SQL-to-DAX validation log | `docs/powerbi_validation_log.md` | [ ] |
+| Dashboard walkthrough | `docs/dashboard_walkthrough.md` | [ ] |
+| Dashboard user guide | `docs/dashboard_user_guide.md` | [ ] |
+| Report design checklist | `docs/report_design_checklist.md` | [ ] |
 
-Confirm the earlier governance and reporting artifacts remain available:
+Dashboard screenshots:
 
-- [ ] project charter
-- [ ] business requirements
-- [ ] stakeholder matrix
-- [ ] KPI dictionary
-- [ ] data governance plan
-- [ ] data asset catalog
-- [ ] data asset scorecards
-- [ ] data lineage
-- [ ] Power BI validation log
-- [ ] dashboard walkthrough
-- [ ] report design checklist
-- [ ] measure definitions
-- [ ] semantic-model notes
+| Dashboard page | Repository path | Status |
+|---|---|---|
+| Executive Overview | `powerbi/screenshots/executive_overview.png` | [ ] |
+| Patient Flow | `powerbi/screenshots/patient_flow.png` | [ ] |
+| Length of Stay | `powerbi/screenshots/length_of_stay.png` | [ ] |
+| Readmissions | `powerbi/screenshots/readmissions.png` | [ ] |
+| Conditions & Procedures | `powerbi/screenshots/conditions_procedures.png` | [ ] |
+| Lab / Observation Operations | `powerbi/screenshots/lab_operations.png` | [ ] |
+| Data Quality & Governance | `powerbi/screenshots/data_quality_governance.png` | [ ] |
 
-Actual filenames should match the paths used by the README and related documentation.
+The local Power BI `.pbix` remains excluded from Git. Aggregate screenshots and semantic-model documentation are the public release evidence.
 
-## 7. Power BI Evidence Review
+### 3.6 Portfolio and career documentation
 
-The committed screenshot set should include:
+| Evidence | Repository path | Status |
+|---|---|---|
+| Public portfolio safety | `README.md`; `docs/security_model.md` | [ ] |
+| Dashboard adoption approach | `docs/adoption_plan.md` | [ ] |
+| Dashboard user guidance | `docs/dashboard_user_guide.md` | [ ] |
+| Change-control process | `docs/change_control.md` | [ ] |
+| Resume and interview talking points | `docs/interview_talking_points.md` | [ ] |
+| Final project walkthrough | `docs/final_walkthrough.md` | [ ] |
+| Final release checklist | `docs/release_checklist.md` | [ ] |
 
-- [ ] Executive Overview
-- [ ] Patient Flow
-- [ ] Length of Stay
-- [ ] Readmissions
-- [ ] Conditions & Procedures
-- [ ] Lab / Observation Operations
-- [ ] Data Quality & Governance
+## 4. Key Release Results
 
-For every screenshot:
+The final release documents the following implementation state:
 
-- [ ] The image is readable at normal GitHub viewing size.
-- [ ] The page title is visible.
-- [ ] No database credentials are visible.
-- [ ] No server connection dialog is visible.
-- [ ] No private local path is visible.
-- [ ] No unnecessary row-level patient-like identifiers are visible.
-- [ ] The screenshot represents synthetic demonstration data.
-- [ ] The screenshot matches the current dashboard documentation.
-- [ ] The image is referenced by the correct repository-relative path.
+| Result | Final documented value |
+|---|---:|
+| Synthetic source entities ingested | 7 |
+| Source rows loaded | 1,259,956 |
+| Gold reporting assets | 20 |
+| Power BI dashboard pages | 7 |
+| Implemented quality checks | 20 |
+| Passed quality checks | 19 |
+| Failed quality checks | 1 |
+| Check-based data quality pass rate | 95.00% |
+| Known excess duplicate observations | 256 |
 
-The local `.pbix` must remain excluded from Git.
+These values describe the synthetic ClinicalPulse environment and must not be presented as real hospital performance.
 
-## 8. FHIR/API and Pipeline Scope Cleanup
+## 5. Known Limitations
 
-Because the FHIR/API and optional pipeline-hardening work were removed from the completed scope:
+- Synthea data does not reproduce real hospital workflow, case mix, privacy obligations, or operational complexity.
+- The 30-day readmission logic uses simplified encounter sequencing and does not distinguish planned from unplanned returns.
+- Observation Volume is affected by the documented duplicate-observation finding.
+- Static screenshots do not reproduce full Power BI interaction behavior.
+- The report has not been deployed to a production Power BI Service workspace.
+- Modeled ownership and access roles are governance assumptions rather than deployed enterprise controls.
+- The project does not claim production readiness, clinical validity, or regulatory compliance.
 
-- [ ] No FastAPI application is presented as implemented.
-- [ ] No API endpoint documentation is presented as completed.
-- [ ] No API SQL views are presented as completed.
-- [ ] No FHIR/API dashboard page is presented as completed.
-- [ ] No FHIR response screenshots or samples are presented as completed.
-- [ ] No Azure Pipeline is presented as an implemented release gate.
-- [ ] README, architecture, walkthrough, resume material, and dashboard documentation describe these components only as excluded or deferred.
-- [ ] Placeholder files that imply completed API or pipeline functionality have been removed.
-- [ ] Historical planning artifacts may mention the original scope only when clearly distinguishable from the final implemented release.
+## 6. Portfolio-Safety Checks
 
-Search for potentially outdated claims:
+Before tagging the release:
 
-```powershell
-rg -n -i "FHIR|FastAPI|API Resource Coverage|api endpoint|Power BI Service|pipeline hardening|Azure Pipeline" README.md docs powerbi azure-devops
-```
-
-Review every match. Acceptable matches should clearly describe excluded scope, historical planning, or limitations.
-
-## 9. Unsafe and Local-Only Artifact Review
-
-The following must not be tracked:
-
-- raw, interim, or processed datasets
-- full Synthea CSV exports
-- compressed CSV or Parquet data
-- SQL Server backups
-- Power BI `.pbix` files
-- `.env` files
-- credentials, passwords, tokens, keys, or connection strings
-- Python cache files
-- virtual environments
-- local database files
-- temporary exports and unmanaged logs
-- screenshots containing private local information
-
-### Tracked-file check
-
-Run:
-
-```powershell
-git ls-files |
-    Select-String -Pattern '(^|/)(data/(raw|interim|processed)/|.*\.csv$|.*\.csv\.gz$|.*\.parquet$|.*\.bak$|.*\.pbix$|\.env$|.*\.pyc$|__pycache__/|\.venv/|venv/)'
-```
-
-Expected result: no unsafe tracked artifacts.
-
-A deliberately curated public sample under `data/samples/` may be retained only when it is minimal, documented as synthetic, and manually reviewed.
-
-### Local ignored-file check
-
-```powershell
-git status --short --ignored
-```
-
-Local raw files or the `.pbix` may appear as ignored. They must not appear as tracked or staged files.
-
-### Staging check
-
-```powershell
-git diff --cached --name-only
-```
-
-Inspect every staged path before committing.
-
-## 10. Credential and Configuration Review
-
-- [ ] Database passwords are not hard-coded.
-- [ ] Tokens, keys, and client secrets are not hard-coded.
-- [ ] `.env` is ignored and untracked.
-- [ ] Public documentation contains example placeholders rather than live credentials.
-- [ ] Local server names and workstation paths are omitted unless harmless and necessary.
-- [ ] SQL and Python source files use safe configuration handling.
-- [ ] Git history has been considered if a secret was ever committed.
-
-Search tracked text for high-risk patterns:
-
-```powershell
-git grep -n -I -E "Password=|PWD=|AccountKey=|ClientSecret=|Bearer [A-Za-z0-9]|api[_-]?key"
-```
-
-Review every match manually. Documentation explaining that secrets must not be committed may produce harmless matches.
-
-Check whether excluded files ever entered history:
-
-```powershell
-git log --all -- .env "*.pbix" "*.bak" "data/raw/**"
-```
-
-Any unexpected history requires review before the public release.
-
-## 11. `.gitignore` Review
-
-Confirm `.gitignore` covers at minimum:
-
-```text
-data/raw/
-data/interim/
-data/processed/
-*.csv
-*.csv.gz
-*.parquet
-*.bak
-*.pbix
-.env
-__pycache__/
-*.pyc
-.DS_Store
-.venv/
-venv/
-```
-
-Checklist:
-
-- [ ] Raw data directories are ignored.
-- [ ] Generated tabular data files are ignored.
-- [ ] SQL Server backups are ignored.
-- [ ] Power BI files are ignored.
-- [ ] Environment and secret files are ignored.
-- [ ] Python caches and virtual environments are ignored.
-- [ ] OS-generated files are ignored.
-- [ ] Any `data/samples/` exception is intentional and safe.
-
-Remember: `.gitignore` does not remove a file that is already tracked.
-
-## 12. Redundant and Obsolete File Review
-
-- [ ] Draft files with names such as `_draft`, `_new`, `_updated`, `_corrected`, `_final2`, or `copy` have been consolidated.
-- [ ] Superseded screenshots have been removed.
-- [ ] Duplicate documentation files have been removed.
-- [ ] Temporary generated text files have been removed.
-- [ ] Empty placeholder documents have been removed.
-- [ ] Broken experiments and abandoned implementation files have been removed.
-- [ ] Obsolete FHIR/API placeholders have been removed.
-- [ ] Obsolete pipeline placeholders have been removed.
-- [ ] Retained historical Azure DevOps artifacts have a clear planning or evidence purpose.
-- [ ] Existing validation scripts are retained only when they provide useful historical or implementation evidence.
-- [ ] No new Python validation script is required for this documentation-only release checklist.
-
-Useful filename search:
-
-```powershell
-Get-ChildItem -Recurse -File |
-    Where-Object {
-        $_.Name -match '(draft|copy|corrected|updated|final2|temp|backup|old)'
-    } |
-    Select-Object FullName
-```
-
-Review matches manually; do not delete a legitimate file merely because its name contains one of these words.
-
-## 13. Documentation Consistency Review
-
-Across `README.md`, `docs/`, and `powerbi/`, confirm:
-
-- [ ] The project is consistently described as using synthetic Synthea data.
-- [ ] No document implies that outputs represent real hospital performance.
-- [ ] No document implies clinical-decision support.
-- [ ] No document claims production deployment.
-- [ ] No document claims HIPAA, PHIPA, SOC 2, or other certification.
-- [ ] SQL Server is described as the analytical backbone.
-- [ ] Power BI is described as using gold-layer assets.
-- [ ] The `.pbix` is described as local and excluded.
-- [ ] The report is described as containing seven completed dashboard pages.
-- [ ] The known duplicate-observation finding remains visible.
-- [ ] The simplified readmission limitation remains visible.
-- [ ] FHIR/API and pipeline hardening are excluded from completed scope.
+- [ ] Raw data under `data/raw/`, `data/interim/`, and `data/processed/` is not tracked.
+- [ ] No `.pbix` file is tracked.
+- [ ] No `.bak`, `.env`, credential, password, token, or connection string is tracked.
+- [ ] No Python cache or virtual-environment files are tracked.
+- [ ] Dashboard screenshots contain no credentials, local paths, or unnecessary row-level identifiers.
+- [ ] README clearly states that the data is synthetic.
+- [ ] Current-facing documentation does not claim real hospital deployment or clinical use.
+- [ ] FHIR/API and optional pipeline hardening are described only as excluded or historical scope.
 - [ ] Power BI Service deployment is not claimed.
-- [ ] KPI names are consistent across the dictionary, DAX definitions, walkthroughs, and README.
-- [ ] Repository paths are consistent across documents.
-- [ ] No end-user-facing document contains unnecessary sprint-process language.
-- [ ] README links render correctly on GitHub.
+- [ ] Known data-quality and readmission limitations remain visible.
 
-Useful consistency searches:
+## 7. Repository and Rendering Checks
 
-```powershell
-rg -n -i "real patient|real hospital|clinical decision|HIPAA|PHIPA|SOC 2|production deployment" README.md docs powerbi
-rg -n -i "duplicate observation|256|readmission|planned|unplanned" README.md docs powerbi
-```
+- [ ] `git status` shows only intended release changes.
+- [ ] No unsafe artifact is staged.
+- [ ] README renders correctly on GitHub.
+- [ ] Architecture diagram renders correctly.
+- [ ] All seven dashboard screenshots render correctly.
+- [ ] Key relative links open successfully.
+- [ ] No links reference `sandbox:`, `/mnt/data/`, or local `C:\` paths.
+- [ ] No unresolved `TODO`, `TBD`, placeholder, or merge-conflict marker remains.
+- [ ] The default branch contains the intended final release state.
 
-Review matches for accurate disclaimers and limitations.
-
-## 14. Markdown Link and Image Review
-
-Manually open the GitHub-rendered README and key documents.
-
-- [ ] Architecture image renders.
-- [ ] Executive Overview image renders if referenced.
-- [ ] Relative links use correct casing.
-- [ ] Links do not point to local `C:\` paths.
-- [ ] Links do not point to `/mnt/data/` or `sandbox:` paths.
-- [ ] Renamed files have no remaining old references.
-- [ ] Heading anchors work where relied upon.
-- [ ] Markdown tables render correctly.
-- [ ] Code blocks are properly closed.
-- [ ] No placeholder text such as `TODO`, `TBD`, or `INSERT SCREENSHOT` remains without an intentional explanation.
-
-Search for unfinished content:
-
-```powershell
-rg -n -i "TODO|TBD|FIXME|INSERT|PLACEHOLDER|lorem ipsum|sandbox:|/mnt/data/|C:\\" README.md docs powerbi sql src
-```
-
-## 15. Source-Code and SQL Review
-
-- [ ] Source files required to reproduce ingestion and transformations are present.
-- [ ] SQL scripts are ordered and named consistently.
-- [ ] SQL scripts do not contain live credentials.
-- [ ] Python files do not contain machine-specific paths that prevent ordinary configuration.
-- [ ] Comments and headers describe actual scope.
-- [ ] No source file claims that the FHIR/API component exists.
-- [ ] No unused API implementation folder remains unless clearly retained as historical, nonfunctional planning evidence.
-- [ ] No abandoned pipeline YAML is presented as active.
-- [ ] Generated cache files are absent from tracked files.
-- [ ] One-off local troubleshooting files are removed.
-
-This story does not require adding another Python validation script. Repository review is performed through direct inspection, Git commands, and documented evidence.
-
-## 16. Git Status and History Review
-
-Before the cleanup commit:
+Recommended commands:
 
 ```powershell
 git status
 git diff
 git diff --cached
-git log --oneline --decorate -15
+git ls-files | Sort-Object
 ```
 
-Confirm:
+## 8. Final Release Commit
 
-- [ ] The working tree changes are understood.
-- [ ] No unrelated file is staged.
-- [ ] No unsafe file is staged.
-- [ ] Commit messages reference the relevant Azure Boards work item where appropriate.
-- [ ] The branch is correct.
-- [ ] The local branch is synchronized as intended before pushing.
-- [ ] No accidental merge conflict markers remain.
-
-Search for conflict markers:
+Stage the final release documentation:
 
 ```powershell
-rg -n "^(<<<<<<<|=======|>>>>>>>)" .
+git add README.md docs powerbi azure-devops
 ```
 
-Expected result: no unresolved merge conflicts.
+Review the staged changes:
 
-## 17. Public GitHub Review
+```powershell
+git status --short
+git diff --cached
+```
 
-After pushing the cleanup commit, review the repository through GitHub rather than only through the local file system.
+Create the final release commit:
 
-- [ ] Repository landing page displays the intended README.
-- [ ] Architecture diagram renders.
-- [ ] Dashboard screenshots render.
-- [ ] Key document links open successfully.
-- [ ] Repository folders are understandable to a reviewer.
-- [ ] No unsafe file is visible.
-- [ ] No `.pbix`, `.bak`, `.env`, or raw dataset is visible.
-- [ ] The project description and topics remain accurate.
-- [ ] The default branch contains the intended final files.
-- [ ] The repository tells a coherent story without requiring access to local tools.
+```powershell
+git commit -m "Prepare ClinicalPulse v1.0.0 final release AB#1705"
+git push
+```
 
-## 18. Final Release Readiness Summary
-
-Record the final review state:
-
-| Review area | Status | Evidence or note |
-|---|---|---|
-| Folder structure |  |  |
-| Required artifacts |  |  |
-| Power BI screenshots |  |  |
-| FHIR/API scope cleanup |  |  |
-| Pipeline scope cleanup |  |  |
-| Unsafe tracked files |  |  |
-| Credential review |  |  |
-| `.gitignore` |  |  |
-| Duplicate and obsolete files |  |  |
-| Documentation consistency |  |  |
-| Links and GitHub rendering |  |  |
-| Git status and staging |  |  |
-| Public repository review |  |  |
-
-## 19. Completion Record
+Record the final commit:
 
 | Field | Value |
 |---|---|
-| Azure Boards user story | AB#1699 — Clean repository and verify folder structure |
-| Draft/build task | AB#1700 |
-| Review/document task | AB#1701 |
-| Deliverable | `docs/release_checklist.md` |
-| Reviewer |  |
-| Review date |  |
 | Branch |  |
-| Commit |  |
+| Commit SHA |  |
 | Pull request |  |
-| Final result | Pending / Passed / Passed with documented exceptions |
+| Commit date |  |
 
-## 20. Assumptions
+## 9. Create the Final Release Tag
 
-- The review is performed from the actual ClinicalPulse repository root.
-- Git and GitHub are the authoritative version-control and public-delivery systems.
-- Azure DevOps remains the authoritative work-tracking system.
-- Local raw data, SQL Server state, credentials, and the `.pbix` may continue to exist outside Git.
-- Existing historical implementation evidence may remain when it has a clear purpose.
-- A single project owner may perform several modeled review roles.
+Create an annotated semantic-version tag:
 
-## 21. Limitations
+```powershell
+git tag -a v1.0.0 -m "ClinicalPulse v1.0.0 - Governed Hospital BI Platform"
+git push origin v1.0.0
+```
 
-- This checklist does not inspect the repository automatically.
-- A completed checklist is only as reliable as the underlying manual review.
-- Secret-pattern searches can produce false positives and cannot guarantee that every secret has been detected.
-- GitHub rendering and link checks require reviewing the pushed repository.
-- Real production release management would require formal security, privacy, operational, accessibility, and organizational approvals.
-- ClinicalPulse remains a synthetic-data portfolio project rather than a production hospital platform.
+Confirm the tag:
 
-## 22. Final Decision Rule
+```powershell
+git show v1.0.0
+git tag --list
+```
 
-The repository is ready for final release only when:
+Record the tag evidence:
 
-- every required item is marked passed or has a documented exception
-- no unsafe artifact is tracked or staged
-- completed scope is represented accurately
-- excluded scope is not presented as implemented
-- README and key documentation render correctly on GitHub
-- the cleanup work is traceable to AB#1699 and its committed artifact
+| Field | Value |
+|---|---|
+| Tag | `v1.0.0` |
+| Tagged commit SHA |  |
+| Tag date |  |
+| GitHub tag URL |  |
+| Result | Pending / Passed |
+
+## 10. GitHub Release
+
+Recommended release title:
+
+```text
+ClinicalPulse v1.0.0 — Governed Hospital BI Platform
+```
+
+Recommended release summary:
+
+```text
+ClinicalPulse v1.0.0 is the final portfolio release of a governed hospital
+business intelligence platform built with synthetic Synthea data, Python,
+SQL Server, T-SQL, Power BI, DAX, Git, and Azure DevOps.
+
+The release includes auditable bronze, silver, and gold data layers,
+reporting-ready dimensions, facts and marts, governed KPI definitions,
+data quality and lineage documentation, seven Power BI dashboard pages,
+SQL-to-DAX validation evidence, and portfolio-ready governance,
+security, adoption, and change-control documentation.
+
+The release uses synthetic data only. It is not a production hospital
+deployment, clinical-decision support system, or regulatory-compliance
+implementation. The originally planned FHIR API and optional pipeline
+hardening components are outside the completed v1.0.0 scope.
+```
+
+GitHub release evidence:
+
+| Field | Value |
+|---|---|
+| Release title | ClinicalPulse v1.0.0 — Governed Hospital BI Platform |
+| Release URL |  |
+| Published date |  |
+| Result | Pending / Passed |
+
+## 11. Azure DevOps Completion Evidence
+
+Before closing AB#1705:
+
+- [ ] AB#1706 is complete.
+- [ ] AB#1707 is complete.
+- [ ] The final commit is linked or referenced.
+- [ ] The `v1.0.0` tag is recorded.
+- [ ] The GitHub release URL is recorded, if created.
+- [ ] Final deliverables and screenshots are listed.
+- [ ] Assumptions, exclusions, and limitations are documented.
+- [ ] AB#1705 is moved to Done.
+
+Suggested Azure Boards comment:
+
+```text
+Completed the ClinicalPulse v1.0.0 final release and evidence checklist.
+
+The release evidence records the final business, SQL Server, Python,
+Power BI, governance, documentation, screenshot, validation, and
+portfolio-safety artifacts. The final release scope excludes the FHIR/API
+component and optional pipeline hardening.
+
+Final artifact:
+- docs/release_checklist.md
+
+Release tag:
+- v1.0.0
+
+Final commit:
+- [insert commit SHA]
+
+GitHub release:
+- [insert release URL, if created]
+```
+
+## 12. Final Approval
+
+| Review area | Status | Evidence or note |
+|---|---|---|
+| Final scope accuracy |  |  |
+| Required deliverables |  |  |
+| SQL implementation |  |  |
+| Python implementation |  |  |
+| Power BI model and measures |  |  |
+| Dashboard screenshots |  |  |
+| KPI and validation evidence |  |  |
+| Governance documentation |  |  |
+| Portfolio safety |  |  |
+| Repository rendering |  |  |
+| Final commit |  |  |
+| `v1.0.0` tag |  |  |
+| GitHub release |  |  |
+
+Final decision:
+
+```text
+[ ] Approved for ClinicalPulse v1.0.0 release
+[ ] Approved with documented exceptions
+[ ] Not approved
+```
+
+Reviewer:
+
+```text
+Name:
+Date:
+Final note:
+```
+
+## 13. Completion Rule
+
+ClinicalPulse is officially complete when:
+
+- the final release commit is pushed
+- the `v1.0.0` annotated tag is pushed
+- the final evidence fields are completed
+- the public repository renders correctly
+- AB#1705, AB#1706, and AB#1707 are closed
+- no excluded artifact or unsupported claim appears in the release
+
+At that point, ClinicalPulse is complete as a governed SQL Server and Power BI hospital BI portfolio project.
