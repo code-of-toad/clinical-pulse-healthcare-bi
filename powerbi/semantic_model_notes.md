@@ -189,3 +189,193 @@ Do not include screenshots that reveal credentials, connection strings, local pr
 - This document confirms the intended governed connection pattern, not production workspace deployment.
 - DirectQuery, gateway configuration, service refresh, Power BI workspace permissions, and deployment pipelines are outside this story.
 - Synthetic data does not represent real patients, real hospital operations, or real clinical outcomes.
+
+
+---
+
+# AB#1584 Semantic Model Relationships and Date Table
+
+## 14. Purpose for AB#1584
+
+This section documents the relationship and date-table design for the ClinicalPulse Power BI semantic model.
+
+The goal is to support consistent filtering by date, encounter class, organization, age band, condition group, and procedure group while keeping Power BI connected to governed SQL Server gold schema assets.
+
+## 15. AB#1584 Artifact Traceability
+
+| Field | Value |
+|---|---|
+| Azure Boards user story | AB#1584 - Build relationships and date table |
+| Parent area | ClinicalPulse\Power BI |
+| Iteration | ClinicalPulse\Sprint 6 - Power BI Reporting |
+| Updated deliverable | `powerbi/semantic_model_notes.md` |
+| Validation support | `src/validate_powerbi_relationships_ab1586.py` |
+| Related task | AB#1585 - Draft/build artifact for Build relationships and date table |
+| Validation task | AB#1586 - Validate and document Build relationships and date table |
+| Evidence task | AB#1587 - Commit and link implementation evidence for Build relationships and date table |
+
+## 16. Actual Power BI Steps for AB#1584
+
+Perform these steps in the local `.pbix` file saved outside the Git repository.
+
+### 16.1 Open the Existing Local PBIX
+
+1. Open Power BI Desktop.
+2. Open the local file:
+
+```text
+clinicalpulse_powerbi_reporting.pbix
+```
+
+3. Confirm the file is connected to the SQL Server `ClinicalPulse` database and uses only gold schema objects.
+
+The `.pbix` file should remain local and should not be committed.
+
+### 16.2 Turn Off Auto Date/Time
+
+In Power BI Desktop:
+
+```text
+File -> Options and settings -> Options -> Current File -> Data Load -> Time intelligence
+```
+
+Uncheck:
+
+```text
+Auto date/time
+```
+
+This ensures the model uses `gold.dim_date` as the governed date table instead of hidden Power BI-generated date tables.
+
+### 16.3 Mark `gold.dim_date` as the Date Table
+
+In Power BI Desktop:
+
+1. Go to Data view or Model view.
+2. Select the imported `gold.dim_date` table.
+3. Choose:
+
+```text
+Table tools -> Mark as date table -> Mark as date table
+```
+
+4. Select the primary date column from `gold.dim_date`.
+
+Use the actual date column in the imported table. The expected candidate is the column that stores one calendar date per row, such as `date`, `date_value`, `calendar_date`, or an equivalent date column.
+
+The selected date column must contain unique, non-null date values.
+
+### 16.4 Create Relationships in Model View
+
+Go to:
+
+```text
+Model view -> Manage relationships -> New
+```
+
+Create relationships using this pattern:
+
+- cardinality: many-to-one from fact to dimension / one-to-many from dimension to fact
+- cross-filter direction: single
+- active relationship: yes
+- dimension side: the one side
+- fact side: the many side
+
+Recommended relationship plan:
+
+| Dimension table | Dimension key / field | Fact table | Fact key / field | Filter supported |
+|---|---|---|---|---|
+| `gold.dim_patient` | patient key | `gold.fact_encounter` | patient key | Age band and patient attributes filter encounters |
+| `gold.dim_patient` | patient key | `gold.fact_readmission` | patient key | Age band and patient attributes filter readmissions |
+| `gold.dim_patient` | patient key | `gold.fact_condition` | patient key | Age band and patient attributes filter conditions |
+| `gold.dim_patient` | patient key | `gold.fact_observation` | patient key | Age band and patient attributes filter observations |
+| `gold.dim_patient` | patient key | `gold.fact_procedure` | patient key | Age band and patient attributes filter procedures |
+| `gold.dim_date` | date key / date field | `gold.fact_encounter` | encounter start/admit date key | Date filtering for encounters and LOS |
+| `gold.dim_date` | date key / date field | `gold.fact_readmission` | index encounter date key | Date filtering for readmissions |
+| `gold.dim_date` | date key / date field | `gold.fact_condition` | condition start date key | Date filtering for conditions |
+| `gold.dim_date` | date key / date field | `gold.fact_observation` | observation date key | Date filtering for observations |
+| `gold.dim_date` | date key / date field | `gold.fact_procedure` | procedure start date key | Date filtering for procedures |
+| `gold.dim_organization` | organization key | `gold.fact_encounter` | organization key | Organization filtering |
+| `gold.dim_organization` | organization key | `gold.fact_readmission` | organization key | Organization filtering for readmissions |
+| `gold.dim_provider` | provider key | `gold.fact_encounter` | provider key | Provider filtering |
+| `gold.dim_encounter_class` | encounter class key | `gold.fact_encounter` | encounter class key | Encounter class filtering |
+| `gold.dim_encounter_class` | encounter class key | `gold.fact_readmission` | encounter class key | Encounter class filtering for readmissions |
+| `gold.dim_condition` | condition key / condition code | `gold.fact_condition` | condition key / condition code | Condition group filtering |
+| `gold.dim_observation` | observation key / observation code | `gold.fact_observation` | observation key / observation code | Observation grouping |
+| `gold.dim_procedure` | procedure key / procedure code | `gold.fact_procedure` | procedure key / procedure code | Procedure group filtering |
+| `gold.fact_encounter` | encounter key / encounter id | `gold.fact_condition` | encounter key / encounter id | Encounter context for conditions |
+| `gold.fact_encounter` | encounter key / encounter id | `gold.fact_observation` | encounter key / encounter id | Encounter context for observations |
+| `gold.fact_encounter` | encounter key / encounter id | `gold.fact_procedure` | encounter key / encounter id | Encounter context for procedures |
+
+Use the exact matching columns that exist in the imported gold tables. Prefer surrogate keys when available. If surrogate keys are not available for a relationship, use the governed natural identifier or code field documented in the gold table.
+
+### 16.5 Do Not Force Ambiguous Relationships
+
+Do not create a relationship if Power BI warns that it would create ambiguity or multiple active paths.
+
+If a second date relationship is needed later, such as discharge date in addition to admission date, keep only the primary reporting date active and document inactive alternatives later when DAX measures are built.
+
+For this story, prioritize the primary date path required for date slicers and dashboard filtering.
+
+### 16.6 Validate Slicer Support
+
+After relationships are created, add temporary test visuals locally. These visuals do not need to be committed.
+
+Create simple table or card checks confirming that filters work from:
+
+| Filter table | Field type to test | Expected behavior |
+|---|---|---|
+| `gold.dim_date` | year, month, date | Filters encounter, readmission, observation, procedure, and condition counts where relationships exist. |
+| `gold.dim_encounter_class` | encounter class | Filters encounter and readmission facts. |
+| `gold.dim_organization` | organization name / id | Filters encounter-based metrics. |
+| `gold.dim_patient` | age band | Filters patient-linked fact tables. |
+| `gold.dim_condition` | condition group / description | Filters condition facts. |
+| `gold.dim_procedure` | procedure group / description | Filters procedure facts. |
+
+Remove temporary test visuals or keep them on a local scratch page that is not treated as a finished dashboard page.
+
+## 17. Model Relationship Standards
+
+| Standard | Required setting |
+|---|---|
+| Date table | Use `gold.dim_date`, not Auto date/time hidden tables. |
+| Relationship direction | Single direction from dimension to fact. |
+| Cardinality | One-to-many from dimension to fact where keys support it. |
+| Active relationships | Keep the primary relationship active. |
+| Ambiguous paths | Avoid ambiguous or circular relationships. |
+| Fact-to-fact relationships | Use sparingly; prefer dimensions for filtering. |
+| Marts/views | Use cautiously; avoid duplicating relationship logic when facts and dimensions already support analysis. |
+
+## 18. Evidence to Capture for AB#1587
+
+Because the `.pbix` file is not committed, capture evidence in Azure Boards or PR notes.
+
+Recommended evidence:
+
+| Evidence type | Where to record |
+|---|---|
+| Confirmation that `gold.dim_date` is marked as the date table | Azure Boards comment |
+| Confirmation that Auto date/time is disabled | Azure Boards comment |
+| Relationship list or screenshot of Model view | Azure Boards comment or safe documentation screenshot if needed |
+| Confirmation that relationships use single-direction filtering | Azure Boards comment |
+| Confirmation that `.pbix` remains local and uncommitted | Azure Boards comment |
+| Validation script output | Azure Boards comment or PR description |
+
+Do not include screenshots containing credentials, local private paths, or row-level synthetic patient detail.
+
+## 19. Assumptions for AB#1584
+
+- The Power BI file is saved locally as `clinicalpulse_powerbi_reporting.pbix`.
+- The file imports SQL Server gold schema tables/views only.
+- `gold.dim_date` contains a unique date column suitable for marking as the model date table.
+- Gold facts and dimensions contain matching key or identifier columns to support relationships.
+- Date filtering is based on the primary business date for each fact table.
+- Relationship work is completed manually in Power BI Desktop and documented in this file because `.pbix` is not committed.
+
+## 20. Limitations for AB#1584
+
+- This documentation does not prove relationships inside a committed `.pbix` because `.pbix` files are intentionally excluded from Git.
+- Exact relationship column names must be confirmed in the local Power BI model.
+- Some alternate date relationships may remain inactive until DAX measures are implemented.
+- Dashboard visuals, DAX measures, and final screenshots are handled in later user stories.
+- Synthetic data does not represent real patient records, real hospital operations, clinical evidence, or clinical recommendations.
