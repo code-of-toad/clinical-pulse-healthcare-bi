@@ -28,35 +28,7 @@ ClinicalPulse supports analysis of:
 
 ## Architecture
 
-```text
-Synthea synthetic CSV data
-          |
-          v
-Python ingestion and audit logging
-          |
-          v
-SQL Server bronze schema
-Source-preserving tables with ingestion metadata
-          |
-          v
-SQL Server silver schema
-Typed, standardized, quality-aware business entities
-          |
-          v
-SQL Server gold schema
-Dimensions, facts, and dashboard-ready reporting marts
-          |
-          v
-Power BI semantic model
-Relationships, date model, governed DAX measures
-          |
-          v
-Operational dashboards and portfolio-safe screenshots
-
-Governance spans the full flow:
-KPI definitions | quality rules | reconciliation | lineage |
-asset catalog | scorecards | ownership | security assumptions
-```
+![ClinicalPulse Architecture](docs/architecture_diagram.png)
 
 Power BI connects only to SQL Server gold-layer assets. Raw CSV files, bronze tables, and silver tables are not used directly by the reporting model.
 
