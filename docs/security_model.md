@@ -1,74 +1,140 @@
-# Security Model and Public Portfolio Safety Assumptions
+# ClinicalPulse Security Model
 
 ## 1. Purpose
 
-This document defines the security and public portfolio safety assumptions for ClinicalPulse.
+This document defines the security, ownership, access, and public-portfolio safety assumptions for ClinicalPulse.
 
-ClinicalPulse uses synthetic healthcare data, but the project still models professional healthcare data handling practices. The goal is to make clear what data can be shared, what must stay local, how credentials are handled, and what access assumptions apply to dashboards, SQL objects, and FHIR-aligned API outputs.
+ClinicalPulse uses synthetic Synthea data. Its records are not real patient records and its outputs must not be interpreted as real hospital performance, clinical evidence, or clinical recommendations. The platform is not intended for clinical-decision support or production hospital use.
 
-## 2. Intended Audience
+## 2. Security Scope
 
-This document is intended for:
+This model covers:
 
-- security and portfolio-safety reviewers checking whether the repository is safe to publish
-- BI developers handling SQL Server connections, Power BI files, and validation outputs
-- data stewards reviewing privacy, access, and governance assumptions
-- technical reviewers evaluating whether synthetic-data handling is explicit and controlled
-- portfolio reviewers assessing whether the project reflects responsible healthcare data practices
+- SQL Server access assumptions for the bronze, silver, gold, governance, and audit schemas
+- Power BI access assumptions for the semantic model, report pages, local `.pbix`, and public screenshots
+- ownership and stewardship responsibilities
+- least-privilege practices
+- repository and credential safety
+- public portfolio publishing boundaries
+- known risks, assumptions, and limitations
 
-## 3. Security Position
+This is a portfolio security model, not an implemented enterprise identity, privacy, or regulatory-compliance program.
 
-ClinicalPulse is a portfolio demonstration project, not a production healthcare system.
+## 3. Security Principles
 
-The project demonstrates security awareness through:
-
-- synthetic-data disclaimers
-- repository exclusion rules
-- least-privilege access assumptions
-- credential and connection-string handling
-- aggregate-first dashboard publishing
-- safe API demonstration boundaries
-- clear limitations around clinical use and production deployment
-
-## 4. Synthetic Data Disclaimer
-
-ClinicalPulse uses synthetic Synthea healthcare data.
-
-The data:
-
-- does not represent real patients
-- does not represent a real hospital population
-- does not represent actual hospital performance
-- must not be interpreted as clinical evidence
-- must not be used for patient care, diagnosis, treatment, or operational decision-making
-
-Project documentation, dashboard screenshots, API examples, and README content should clearly describe outputs as synthetic and demonstration-oriented.
-
-## 5. Public Portfolio Safety Rules
-
-The public repository should contain only project-safe artifacts.
-
-| Item | Repository Rule |
+| Principle | ClinicalPulse application |
 |---|---|
-| Source code | Safe to commit if it does not contain secrets, credentials, local paths, or restricted data. |
-| SQL scripts | Safe to commit if they define schema, transformations, validation logic, or views without embedded sensitive values. |
-| Documentation | Safe to commit if it does not imply real patient data, real hospital deployment, or clinical decision support. |
-| Tiny synthetic samples | Allowed only if intentionally curated and clearly documented as synthetic. |
-| Raw generated datasets | Keep out of Git by default. |
-| Local database backups | Keep out of Git. |
-| Power BI `.pbix` files | Keep out of Git unless intentionally reviewed and confirmed safe. |
-| Dashboard screenshots | Use aggregate views and avoid unnecessary row-level detail. |
-| API examples | Use synthetic identifiers and clearly mark responses as demonstration outputs. |
-| Environment files | Keep out of Git. |
-| Secrets and credentials | Never commit. |
+| Least privilege | A role should receive only the access required for its responsibility. |
+| Separation of layers | Source-preserving, transformation, reporting, governance, and audit assets have different audiences and access assumptions. |
+| Gold-only reporting | Power BI should use governed gold-layer assets rather than raw files, bronze tables, or unmanaged extracts. |
+| Aggregate-first publication | Public dashboard evidence should emphasize aggregated KPIs, trends, and grouped breakdowns. |
+| Synthetic-data transparency | Every public description should state that Synthea records are synthetic and do not represent real patients or hospitals. |
+| No secrets in Git | Credentials, connection strings, `.env` files, backups, and local configuration must remain outside the repository. |
+| Governed metric use | Dashboard measures should trace to documented KPI definitions and SQL validation logic. |
+| Evidence without embedded data | Public screenshots and documentation should demonstrate the report while the local `.pbix` remains excluded. |
+| Honest scope | Deferred FHIR/API and optional pipeline-hardening work must not be presented as implemented. |
 
-## 6. Repository Exclusion Rules
+## 4. Role-Based Access Assumptions
 
-The project `.gitignore` should exclude generated data, local environment files, credentials, and large or unsafe local artifacts.
+| Role | Intended access | Not intended to access | Primary responsibility |
+|---|---|---|---|
+| Project Owner | Repository, documentation, Azure Boards, delivery evidence, and portfolio-facing decisions | Production patient systems or real hospital data | Own scope, delivery discipline, and public portfolio safety |
+| Data Platform Owner | SQL Server layers, ingestion scripts, transformations, audit outputs, and local configuration | Business reinterpretation of KPIs without governance review | Maintain data-layer structure and technical integrity |
+| Data Steward | KPI dictionary, quality rules, lineage, data catalog, scorecards, and quality findings | Secret values or unnecessary direct-identifier-style fields | Maintain metric meaning, quality interpretation, and governance clarity |
+| BI Developer | Gold-layer assets, semantic model, DAX measures, report pages, and screenshots | Raw source data or bronze identifiers except when needed for controlled troubleshooting | Build and reconcile stakeholder-facing reporting |
+| Operational Reporting Owner | Dashboard pages, KPI definitions, interpretation notes, and adoption decisions | Database credentials, raw files, and transformation write access | Confirm business usefulness and appropriate interpretation |
+| Executive Viewer | Aggregate dashboards and summary documentation | SQL Server write access, raw files, or row-level patient-like records | Consume high-level operational KPIs and trust indicators |
+| Platform Administrator | Local SQL Server configuration and Power BI environment settings | Unreviewed ownership of metric definitions | Maintain platform configuration and technical access boundaries |
+| Portfolio Reviewer | README, selected documentation, source code, aggregate screenshots, and reviewed examples | Raw generated data, `.pbix`, `.env`, backups, secrets, or local-only configuration | Review the project as a professional public artifact |
 
-Recommended exclusions:
+These roles are modeled governance responsibilities. They are not evidence that enterprise groups, service accounts, or production access controls have been deployed.
 
-```gitignore
+## 5. SQL Server Layer Access Assumptions
+
+| Layer / schema | Typical access | Security assumption | Reporting use |
+|---|---|---|---|
+| `bronze` | Data Platform Owner; limited troubleshooting access for the BI Developer or Data Steward | Restricted because it preserves source-like structure and direct-identifier-style synthetic fields | Never a direct Power BI source |
+| `silver` | Data Platform Owner, Data Steward, BI Developer | Controlled transformation and quality-review layer with lineage and validation flags | Used for validation and transformation, not primary reporting |
+| `gold` | BI Developer, Data Steward, Operational Reporting Owner with read access | Governed, business-ready layer that excludes unnecessary direct identifiers | Authoritative Power BI source |
+| `governance` | Data Steward and BI Developer with read access; Data Platform Owner with maintenance access | Contains quality-rule and reporting-trust evidence | Supports governance reporting |
+| `audit` | Data Platform Owner and Data Steward | Contains ingestion, file-load, and reconciliation metadata | Used for traceability rather than business KPIs |
+
+## 6. Direct-Identifier-Style Synthetic Fields
+
+The bronze patient source includes Synthea fields resembling names, addresses, SSNs, driver identifiers, and passport identifiers. Although these values are synthetic, they are not required for the project’s analytical goals.
+
+Required handling:
+
+- keep the source-preserving bronze layer local
+- do not carry unnecessary direct-identifier-style fields into gold assets
+- do not expose these fields in public screenshots or documentation samples
+- use synthetic technical identifiers only where traceability requires them
+- prefer aggregate outputs for all public reporting evidence
+- manually review any intentionally published sample before committing it
+
+Synthetic data lowers real-world privacy risk but does not justify careless publishing practices.
+
+## 7. Power BI Security Assumptions
+
+| Area | Required practice |
+|---|---|
+| Data source | Connect Power BI to selected gold tables and marts only |
+| Import storage | Treat the local `.pbix` as an embedded-data artifact because Import mode can contain copied model data |
+| Semantic model | Build relationships and measures from governed gold assets and document them separately |
+| Report pages | Present aggregate KPIs, trends, distributions, and grouped comparisons |
+| Row-level detail | Avoid unnecessary patient-like records, identifiers, names, addresses, and unrestricted drill-through evidence |
+| Screenshots | Review for identifiers, credentials, server names, local paths, and unintended UI information before publication |
+| Public evidence | Publish aggregate screenshots, measure definitions, model notes, and reconciliation documentation |
+| `.pbix` handling | Keep the `.pbix` local and excluded from Git |
+| Power BI Service | No production deployment or workspace-security implementation is claimed |
+
+## 8. Public Portfolio Safety Boundary
+
+### 8.1 Safe public artifacts
+
+The following may be committed after review:
+
+- SQL and Python source code without credentials or hard-coded local secrets
+- architecture, governance, lineage, KPI, semantic-model, and user documentation
+- aggregate Power BI screenshots
+- source inventories that redact direct-identifier-style sample values
+- quality and reconciliation summaries
+- intentionally curated synthetic examples that disclose their synthetic origin
+- Azure DevOps planning and delivery evidence that does not reveal secrets
+
+### 8.2 Local-only or excluded artifacts
+
+The following should remain outside the public repository:
+
+- `data/raw/`, `data/interim/`, and `data/processed/`
+- generated CSV, compressed CSV, and Parquet files
+- SQL Server database files and `.bak` backups
+- the Power BI `.pbix`
+- `.env` files
+- passwords, access tokens, connection strings, and credentials
+- local configuration containing machine-specific or sensitive server information
+- unreviewed row-level exports
+- temporary files, caches, and logs containing local paths or environment details
+
+### 8.3 Publication decision matrix
+
+| Artifact | Default disposition | Reason |
+|---|---|---|
+| Raw Synthea files | Exclude | Large, unnecessary for review, and may contain direct-identifier-style synthetic fields |
+| Bronze sample rows | Exclude or heavily redact | Source-preserving fields exceed public reporting needs |
+| Silver and gold SQL definitions | Publish | Demonstrates transformation and modeling logic without embedding data |
+| Aggregate dashboard screenshots | Publish after review | Provides visual evidence without distributing the embedded semantic model |
+| Power BI `.pbix` | Exclude | May contain imported model data, connection metadata, and local configuration |
+| `.env` and credentials | Exclude | Secret material must never be committed |
+| Database backups | Exclude | Contain full local database state and are unnecessary for portfolio review |
+| KPI, lineage, and governance documents | Publish | Demonstrate governed reporting practices |
+| Small synthetic examples | Publish only after manual review | Must be intentional, minimal, clearly synthetic, and free of unnecessary fields |
+
+## 9. Repository Safety Controls
+
+The `.gitignore` should cover at minimum:
+
+```text
 data/raw/
 data/interim/
 data/processed/
@@ -78,169 +144,104 @@ data/processed/
 *.bak
 *.pbix
 .env
-__pycache__/
-*.pyc
-.DS_Store
 .venv/
 venv/
+__pycache__/
+*.pyc
 ```
 
-Tiny demonstration samples may be stored under `data/samples/` only when they are deliberately curated, small, synthetic, and documented.
+Additional repository practices:
 
-## 7. Secrets and Credential Handling
+- use environment variables for database credentials and connection strings
+- do not hard-code passwords or local authentication secrets
+- inspect staged files before every public commit
+- remove generated exports and local logs unless they provide reviewed, necessary evidence
+- do not rely on `.gitignore` alone after a sensitive file has already been tracked
+- review Git history before release if a secret or excluded artifact was ever committed
+- preserve only documentation and evidence that serve a clear portfolio purpose
 
-Database credentials and connection strings must not be hardcoded into committed scripts.
+## 10. Asset Ownership Matrix
 
-Expected practices:
+| Asset group | Owner role | Steward role | Security posture |
+|---|---|---|---|
+| Raw source files | Data Platform Owner | Data Steward | Local only |
+| Bronze tables | Data Platform Owner | Data Steward | Restricted source-preserving layer |
+| Silver tables | Data Platform Owner | Data Steward | Controlled transformation and validation layer |
+| Gold dimensions and facts | Data Platform Owner | BI Developer / Data Steward | Governed analytical layer |
+| Gold marts | BI Developer | Data Steward | Preferred reporting source |
+| KPI dictionary | Operational Reporting Owner | Data Steward | Public governed-definition artifact |
+| Data asset catalog | Data Steward | Data Steward | Public governance reference |
+| Data lineage | Data Steward | Data Platform Owner | Public traceability reference |
+| Data asset scorecards | Data Steward | Operational Reporting Owner | Public readiness and trust evidence |
+| Power BI semantic model | BI Developer | Data Steward | Local model with public documentation |
+| Dashboard pages | BI Developer | Operational Reporting Owner | Aggregate stakeholder reporting |
+| Dashboard screenshots | BI Developer | Data Steward | Public only after safety review |
+| Repository and release | Project Owner | Data Steward | Public portfolio surface |
 
-- store local database credentials in `.env` or local machine configuration
-- exclude `.env` from Git
-- read credentials through environment variables
-- avoid committing server names, usernames, passwords, tokens, API keys, or local file paths that reveal private configuration
-- use placeholder values in documentation and sample configuration files
+## 11. Least-Privilege Examples
 
-Example placeholder pattern:
-
-```text
-SQLSERVER_HOST=localhost
-SQLSERVER_DATABASE=ClinicalPulse
-SQLSERVER_DRIVER=ODBC Driver 17 for SQL Server
-SQLSERVER_TRUSTED_CONNECTION=yes
-```
-
-If a sample environment file is needed later, it should be committed as `.env.example`, not `.env`.
-
-## 8. Role-Based Access Assumptions
-
-ClinicalPulse models least-privilege access through assumed roles. These roles are documented for project design clarity and are not production identity-management controls.
-
-| Role | Assumed Access |
+| Scenario | Appropriate access |
 |---|---|
-| BI Developer | Can build SQL transformations, validation queries, Power BI measures, and dashboard assets. |
-| Data Steward | Can review KPI definitions, data quality rules, lineage, assumptions, and governed documentation. |
-| Operational Leader | Can view aggregate dashboard outputs and business-facing KPI definitions. |
-| Executive Viewer | Can view high-level dashboard pages and reporting trust indicators. |
-| API Consumer | Can access selected read-only synthetic API endpoints for demonstration. |
-| Platform Administrator | Can manage local SQL Server configuration, database objects, environment settings, and repository hygiene. |
+| Build report visuals | Read access to selected gold dimensions, facts, and marts |
+| Review KPI meaning | KPI dictionary, related validation output, and gold query results |
+| Investigate a quality issue | Relevant silver records, governance quality results, and lineage documentation |
+| Review ingestion execution | Audit batch and file-log outputs without unrelated business data |
+| Review the public project | README, source code, safe documentation, and aggregate screenshots |
+| Maintain the local platform | Necessary SQL Server and Power BI configuration without exposing credentials to repository users |
 
-Least-privilege expectation: each role should receive only the access required for its project responsibility.
+## 12. Known Findings and Controls
 
-## 9. SQL Server Safety Assumptions
+| Area | Finding or risk | Control |
+|---|---|---|
+| Bronze patient fields | Source data contains direct-identifier-style synthetic values | Keep bronze local and exclude unnecessary fields from gold and screenshots |
+| Power BI Import mode | The `.pbix` may contain imported data and connection metadata | Keep it local and provide screenshots and model documentation instead |
+| Local credentials | Connection details may exist in environment or local configuration | Use `.env` and exclude secrets from Git |
+| Observation duplicates | A governed duplicate-observation finding affects observation-volume interpretation | Keep the caveat visible in quality, KPI, and report documentation |
+| Screenshots | UI captures can unintentionally expose paths, server details, or identifiers | Review and crop screenshots before publication |
+| Synthetic-data claims | Reviewers may mistake simulated output for real hospital evidence | Repeat the synthetic-data disclaimer and state interpretation boundaries |
+| Deferred components | Original plans included FHIR/API and optional pipeline hardening | Mark both as out of scope and do not present them as implemented |
 
-ClinicalPulse SQL Server work is assumed to run in a local development environment.
+## 13. Public Release Review
 
-Safety assumptions:
+Before a public release or major portfolio update, confirm that:
 
-- SQL Server is used as the analytical backbone for synthetic data only
-- local databases do not contain real patient data
-- database backups are not committed
-- SQL scripts should be reusable without embedding credentials
-- bronze, silver, gold, governance, audit, and API schemas separate responsibilities
-- audit and governance tables may store run metadata, quality results, lineage, and validation outputs
-- API-facing views should expose only the fields needed for the demonstration
+- the README clearly states the synthetic-data boundary
+- no raw, interim, or processed dataset is staged
+- no `.pbix`, `.bak`, `.env`, credential, or connection string is staged
+- screenshots contain aggregate views and no unnecessary identifiers
+- SQL and Python files contain no hard-coded secrets
+- sample data is minimal, intentional, and manually reviewed
+- documentation does not imply real hospital deployment or clinical use
+- FHIR/API and optional pipeline hardening are described only as excluded or deferred scope
+- known data-quality limitations remain visible
+- the release describes only artifacts that actually exist
 
-## 10. Power BI Safety Assumptions
+## 14. Claims Not Made
 
-Power BI outputs should be safe for portfolio review.
+ClinicalPulse does not claim:
 
-Rules:
+- access to real patient, hospital, or production EHR data
+- suitability for clinical-decision support
+- production hospital deployment readiness
+- compliance certification under HIPAA, PHIPA, SOC 2, or another framework
+- implementation of enterprise SQL Server roles, Azure Entra ID groups, Power BI workspace roles, or row-level security
+- a production FHIR server or completed interoperability API
+- automated CI/CD or optional pipeline-hardening implementation
 
-- connect Power BI to curated gold-layer tables or views
-- avoid building dashboards directly from raw source files
-- use aggregate visuals where possible
-- avoid unnecessary row-level tables in public screenshots
-- document KPI definitions and measure assumptions
-- validate dashboard metrics against SQL queries before presenting them as trustworthy
-- avoid committing `.pbix` files unless the file has been reviewed for embedded data, credentials, and privacy safety
+## 15. Assumptions
 
-## 11. FHIR/API Demonstration Safety
+- ClinicalPulse runs in a controlled local development environment.
+- All healthcare records are synthetic.
+- SQL Server is the analytical backbone.
+- Power BI uses Import mode and connects to gold-layer assets.
+- The `.pbix`, source data, backups, and credentials remain local.
+- Modeled roles represent governance intent rather than deployed enterprise security groups.
+- Public portfolio evidence consists primarily of source code, documentation, and aggregate screenshots.
 
-The ClinicalPulse API component is read-only and demonstration-oriented.
+## 16. Limitations
 
-Safety assumptions:
-
-- API outputs use synthetic identifiers
-- endpoints do not expose real patient data
-- responses are FHIR-aligned examples, not certified FHIR server outputs
-- API examples are clearly marked as synthetic demonstrations
-- endpoints expose only selected resources needed to demonstrate interoperability literacy
-- row-level API examples should be limited and intentional
-- aggregate metric endpoints should not imply real hospital performance
-
-Planned API resources may include Patient, Encounter, Observation, Condition, Procedure, Organization, and Practitioner-style outputs.
-
-## 12. Dashboard and Screenshot Safety
-
-Public screenshots should support review without creating misleading or unsafe disclosure.
-
-Screenshot rules:
-
-- prefer aggregate dashboard pages
-- avoid unnecessary patient-level detail
-- avoid screenshots containing local file paths, server names, usernames, or connection strings
-- label synthetic data clearly where appropriate
-- avoid claims that the dashboard reflects real hospital operations
-- use screenshots to demonstrate BI design, governed KPIs, and reporting trust, not clinical conclusions
-
-## 13. Documentation Safety
-
-Documentation should be accurate about project boundaries.
-
-Documentation must not claim that ClinicalPulse is:
-
-- a production hospital system
-- a clinical decision support tool
-- a real patient dataset
-- a certified FHIR server
-- a substitute for hospital-grade security, privacy, compliance, or identity management
-
-Documentation should state that ClinicalPulse is a governed healthcare BI portfolio project using synthetic EHR-style data.
-
-## 14. Local Development Assumptions
-
-ClinicalPulse assumes a local development workflow.
-
-Expected local-only items include:
-
-- raw generated Synthea files
-- local SQL Server database files and backups
-- `.env` files
-- local Python virtual environments
-- temporary exports
-- intermediate transformed data files
-- unreviewed Power BI files
-
-These items should remain outside the public repository unless specifically curated for safe demonstration.
-
-## 15. Review Checklist Before Publishing
-
-Before committing or publishing project files, review for:
-
-- raw generated data files
-- `.env` files or secrets
-- database backups
-- embedded credentials
-- local machine paths
-- unnecessary row-level screenshots
-- `.pbix` files with embedded data or credentials
-- misleading claims about real patients, real hospitals, clinical use, or production deployment
-- API examples that are not clearly synthetic
-- documentation that contradicts the project’s synthetic-data scope
-
-## 16. Assumptions
-
-- ClinicalPulse uses synthetic Synthea data only.
-- The project is public-portfolio-oriented and not intended for production deployment.
-- One builder may perform multiple roles, but role separation is documented to model professional access thinking.
-- Security controls are documented as assumptions and development practices, not implemented as enterprise controls.
-- API outputs are read-only and demonstration-oriented.
-- Power BI screenshots should prioritize aggregate reporting and avoid unnecessary row-level detail.
-
-## 17. Limitations
-
-- This document does not implement enterprise identity management, encryption policies, network security, or production audit controls.
-- Role-based access is documented conceptually and may not be enforced through a production authorization system.
-- Local SQL Server configuration is outside the scope of this document.
-- Synthetic data reduces privacy risk but does not remove the need for responsible repository hygiene.
-- FHIR-aligned API outputs demonstrate interoperability concepts but do not represent production FHIR compliance.
-- Dashboard outputs are for portfolio demonstration and should not be interpreted as real operational or clinical findings.
+- This document does not itself enforce database permissions, authentication, encryption, retention, or workspace access.
+- Synthetic data does not reproduce the legal, privacy, security, and operational requirements of real healthcare data.
+- Public screenshot review is a manual control and can fail if not performed carefully.
+- A production implementation would require formal identity management, encryption review, audit policy, incident response, data retention rules, privacy review, and organizational approval.
+- ClinicalPulse is not certified for HIPAA, PHIPA, SOC 2, or production clinical use.
