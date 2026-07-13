@@ -95,6 +95,63 @@ The Power BI report uses a documented gold-layer semantic model, a shared date d
 
 See the [dashboard walkthrough](docs/dashboard_walkthrough.md) for screenshot-by-screenshot interpretation.
 
+### Dashboard gallery
+
+Select any image to open the full-size screenshot.
+
+<table>
+  <tr>
+    <td width="50%" align="center">
+      <a href="powerbi/screenshots/executive_overview.png">
+        <img src="powerbi/screenshots/executive_overview.png" alt="ClinicalPulse Executive Overview dashboard">
+      </a>
+      <br><strong>Executive Overview</strong>
+    </td>
+    <td width="50%" align="center">
+      <a href="powerbi/screenshots/patient_flow.png">
+        <img src="powerbi/screenshots/patient_flow.png" alt="ClinicalPulse Patient Flow dashboard">
+      </a>
+      <br><strong>Patient Flow</strong>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" align="center">
+      <a href="powerbi/screenshots/length_of_stay.png">
+        <img src="powerbi/screenshots/length_of_stay.png" alt="ClinicalPulse Length of Stay dashboard">
+      </a>
+      <br><strong>Length of Stay</strong>
+    </td>
+    <td width="50%" align="center">
+      <a href="powerbi/screenshots/readmissions.png">
+        <img src="powerbi/screenshots/readmissions.png" alt="ClinicalPulse Readmissions dashboard">
+      </a>
+      <br><strong>Readmissions</strong>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" align="center">
+      <a href="powerbi/screenshots/conditions_procedures.png">
+        <img src="powerbi/screenshots/conditions_procedures.png" alt="ClinicalPulse Conditions and Procedures dashboard">
+      </a>
+      <br><strong>Conditions &amp; Procedures</strong>
+    </td>
+    <td width="50%" align="center">
+      <a href="powerbi/screenshots/lab_operations.png">
+        <img src="powerbi/screenshots/lab_operations.png" alt="ClinicalPulse Lab and Observation Operations dashboard">
+      </a>
+      <br><strong>Lab / Observation Operations</strong>
+    </td>
+  </tr>
+  <tr>
+    <td colspan="2" align="center">
+      <a href="powerbi/screenshots/data_quality_governance.png">
+        <img src="powerbi/screenshots/data_quality_governance.png" alt="ClinicalPulse Data Quality and Governance dashboard" width="82%">
+      </a>
+      <br><strong>Data Quality &amp; Governance</strong>
+    </td>
+  </tr>
+</table>
+
 ## Governance and Reporting Trust
 
 ClinicalPulse includes governance artifacts that connect business meaning to implementation evidence:
